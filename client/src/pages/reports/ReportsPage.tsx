@@ -237,13 +237,13 @@ export default function ReportsPage() {
       />
 
       {/* ── Period Tabs + Filters ── */}
-      <div className="flex items-center gap-6 print:hidden">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6 print:hidden">
         <div className="flex bg-surface-sunken rounded-[var(--radius-md)] p-1">
           {(['daily', 'weekly', 'monthly'] as Period[]).map(p => (
             <button
               key={p}
               onClick={() => changePeriod(p)}
-              className={`px-4 py-1.5 text-[13px] font-medium rounded-[var(--radius-sm)] transition-colors duration-150 ${
+              className={`px-3 sm:px-4 py-1.5 text-[12px] sm:text-[13px] font-medium rounded-[var(--radius-sm)] transition-colors duration-150 ${
                 period === p ? 'bg-surface text-primary-600 shadow-xs' : 'text-text-tertiary hover:text-text-primary'
               }`}
             >
@@ -253,7 +253,7 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-text-tertiary" />
+          <Calendar size={16} className="text-text-tertiary hidden sm:block" />
           <input
             type="date"
             value={selectedDate}
@@ -265,7 +265,7 @@ export default function ReportsPage() {
         <select
           value={contractor}
           onChange={e => changeContractor(e.target.value)}
-          className="px-3 py-1.5 text-[13px] border border-border rounded-[var(--radius-sm)] bg-surface text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-150"
+          className="px-3 py-1.5 text-[13px] border border-border rounded-[var(--radius-sm)] bg-surface text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-150 max-w-[200px]"
         >
           <option value="">All Contractors</option>
           {(contractors || []).map(c => <option key={c} value={c}>{c}</option>)}
@@ -292,7 +292,7 @@ export default function ReportsPage() {
       {reportData && sm && (
         <>
           {/* ── Summary Cards ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
             <SummaryCard icon={Eye} label="Observations" value={sm.observations.total} color="text-primary-600" bg="bg-primary-50" />
             <SummaryCard icon={ClipboardCheck} label="Permits" value={sm.permits.total} color="text-info-600" bg="bg-info-50" />
             <SummaryCard icon={AlertTriangle} label="Incidents" value={sm.incidents.total} color="text-danger-600" bg="bg-danger-50" />
@@ -307,7 +307,7 @@ export default function ReportsPage() {
 
           {/* ── Charts Row ── */}
           {reportData.trend.length > 1 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 print:grid-cols-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 print:grid-cols-2">
               <SectionCard title="Activity Trend" className="lg:col-span-2">
                 <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={reportData.trend}>
@@ -341,7 +341,7 @@ export default function ReportsPage() {
           {/* ── Module Breakdown Cards ── */}
           <div>
             <h3 className="text-[13px] font-semibold text-text-secondary uppercase tracking-wider mb-3">Module Breakdown</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
               {Object.entries(MODULE_LABELS).map(([key, label]) => {
                 const mod = (sm as any)[key];
                 if (!mod) return null;
@@ -469,8 +469,8 @@ export default function ReportsPage() {
 
                 {/* Pagination */}
                 {reportData.records.pages > 1 && (
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border print:hidden">
-                    <span className="text-[11px] text-text-tertiary">
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border print:hidden gap-2">
+                    <span className="text-[10px] sm:text-[11px] text-text-tertiary whitespace-nowrap">
                       Page {reportData.records.page} of {reportData.records.pages}
                     </span>
                     <div className="flex gap-1">
@@ -503,12 +503,12 @@ export default function ReportsPage() {
 // ─── Sub-components ─────────────────────────────────
 function SummaryCard({ icon: Icon, label, value, color, bg }: { icon: LucideIcon; label: string; value: string | number; color: string; bg: string }) {
   return (
-    <div className={`${bg} rounded-[var(--radius-lg)] border border-border p-4`}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon size={15} className={color} />
-        <span className="text-[11px] text-text-secondary">{label}</span>
+    <div className={`${bg} rounded-[var(--radius-lg)] border border-border p-3 sm:p-4`}>
+      <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+        <Icon size={14} className={`${color} shrink-0`} />
+        <span className="text-[10px] sm:text-[11px] text-text-secondary truncate">{label}</span>
       </div>
-      <p className={`text-[20px] font-bold ${color}`}>{value}</p>
+      <p className={`text-[16px] sm:text-[20px] font-bold ${color}`}>{value}</p>
     </div>
   );
 }

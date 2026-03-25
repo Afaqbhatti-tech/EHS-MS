@@ -72,8 +72,8 @@ export function StatCard({ icon: Icon, label, value, color = 'primary', trend, s
         )}
       </div>
       <div className="mt-3">
-        <p className="text-[30px] leading-[38px] font-bold text-text-primary tracking-tight">{value}</p>
-        <p className="text-[13px] font-medium text-text-secondary mt-1">{label}</p>
+        <p className="text-[24px] sm:text-[30px] leading-[30px] sm:leading-[38px] font-bold text-text-primary tracking-tight">{value}</p>
+        <p className="text-[12px] sm:text-[13px] font-medium text-text-secondary mt-1">{label}</p>
         {subtext && <p className="text-[11px] text-text-tertiary mt-0.5">{subtext}</p>}
       </div>
     </Card>
@@ -92,11 +92,11 @@ interface SectionCardProps {
 export function SectionCard({ title, action, children, className }: SectionCardProps) {
   return (
     <Card padding="none" className={className}>
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h3 className="text-[15px] font-semibold text-text-primary">{title}</h3>
-        {action}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border gap-2">
+        <h3 className="text-[14px] sm:text-[15px] font-semibold text-text-primary truncate">{title}</h3>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4 sm:p-6">{children}</div>
     </Card>
   );
 }

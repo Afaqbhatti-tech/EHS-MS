@@ -85,28 +85,28 @@ export default function WorkLineDetailPage() {
   return (
     <div className="space-y-5 max-w-[1440px]">
       {/* Back + Header */}
-      <div className="flex items-center justify-between pb-5 border-b border-border">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 border-b border-border">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/rams-board')}
-            className="p-1.5 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-secondary transition-colors duration-150"
+            className="p-1.5 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-secondary transition-colors duration-150 shrink-0"
           >
             <ArrowLeft size={18} />
           </button>
           {data && (
-            <div className="flex items-center gap-2.5">
-              <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: data.work_line.color }} />
-              <div>
-                <h1 className="text-[20px] font-bold text-text-primary">{data.work_line.name}</h1>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: data.work_line.color }} />
+              <div className="min-w-0">
+                <h1 className="text-[18px] sm:text-[20px] font-bold text-text-primary truncate">{data.work_line.name}</h1>
                 {data.work_line.description && (
-                  <p className="text-[11px] text-text-tertiary">{data.work_line.description}</p>
+                  <p className="text-[11px] text-text-tertiary truncate">{data.work_line.description}</p>
                 )}
               </div>
             </div>
           )}
         </div>
         {canUpload && data && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowNewModal(true)}>
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowNewModal(true)} className="self-start sm:self-auto shrink-0">
             New Document
           </Button>
         )}
@@ -222,7 +222,7 @@ function DocumentRow({ doc, onClick }: { doc: RamsDocSummary; onClick: () => voi
           {doc.description && (
             <p className="text-[11px] text-text-tertiary mt-0.5 line-clamp-1">{doc.description}</p>
           )}
-          <div className="flex items-center gap-4 mt-2 text-[11px] text-text-disabled">
+          <div className="flex items-center gap-3 sm:gap-4 mt-2 text-[11px] text-text-disabled flex-wrap">
             {doc.contractor && (
               <span className="flex items-center gap-1">
                 <Tag size={11} /> {doc.contractor}
@@ -239,7 +239,7 @@ function DocumentRow({ doc, onClick }: { doc: RamsDocSummary; onClick: () => voi
               </span>
             )}
             {doc.latest_version && (
-              <span className="flex items-center gap-1">
+              <span className="hidden sm:flex items-center gap-1">
                 <FileText size={11} /> {doc.latest_version.file_name}
               </span>
             )}

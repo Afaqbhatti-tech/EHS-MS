@@ -137,7 +137,7 @@ export default function NotificationPanel() {
 
       {/* Dropdown Panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[380px] bg-white rounded-[var(--radius-lg)] shadow-xl border border-border z-50 flex flex-col max-h-[520px]">
+        <div className="fixed inset-x-0 top-14 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:top-full sm:mt-2 w-full sm:w-[380px] bg-white sm:rounded-[var(--radius-lg)] shadow-xl border-b sm:border border-border z-50 flex flex-col max-h-[calc(100dvh-3.5rem)] sm:max-h-[520px]">
           {/* Header */}
           <div className="px-4 py-3 border-b border-border shrink-0">
             <div className="flex items-center justify-between mb-2">

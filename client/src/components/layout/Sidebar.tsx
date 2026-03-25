@@ -227,7 +227,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           fixed inset-y-0 left-0 z-50 w-[272px] sm:w-[248px] bg-sidebar text-white flex flex-col h-screen overflow-hidden
           sidebar-drawer
           lg:static lg:z-auto lg:translate-x-0 lg:shrink-0
-          ${open ? '' : 'closed lg:!transform-none'}
+          ${open ? '' : 'closed'}
         `}
       >
         {sidebarContent}

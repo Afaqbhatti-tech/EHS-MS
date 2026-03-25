@@ -85,7 +85,7 @@ export default function LoginPage() {
       </div>
 
       {/* ── Right Panel (Light) ──────────────── */}
-      <div className="flex-1 flex items-center justify-center bg-canvas px-6 py-12">
+      <div className="flex-1 flex items-center justify-center bg-canvas px-4 sm:px-6 py-8 sm:py-12">
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
@@ -96,7 +96,7 @@ export default function LoginPage() {
           </div>
 
           {/* Login card */}
-          <div className="bg-white rounded-[var(--radius-xl)] shadow-xl border border-border p-10">
+          <div className="bg-white rounded-[var(--radius-xl)] shadow-xl border border-border p-6 sm:p-10">
             <h2 className="text-[24px] leading-[32px] font-bold text-text-primary">
               Welcome back
             </h2>

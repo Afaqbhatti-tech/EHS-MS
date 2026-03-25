@@ -116,15 +116,15 @@ export default function MyProfilePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-3xl mx-auto py-4 sm:py-8 space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-5">
-        <div className="w-16 h-16 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold text-white shrink-0">
+      <div className="flex items-center gap-4 sm:gap-5">
+        <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-full bg-primary-600 flex items-center justify-center text-lg sm:text-xl font-bold text-white shrink-0">
           {initials}
         </div>
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">{user?.name}</h1>
-          <p className="text-[13px] text-text-tertiary">{user?.email}</p>
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-semibold text-text-primary truncate">{user?.name}</h1>
+          <p className="text-[12px] sm:text-[13px] text-text-tertiary truncate">{user?.email}</p>
           <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-50 text-primary-700 border border-primary-100">
             {ROLE_LABELS[user?.role || ''] || user?.role}
           </span>
@@ -133,12 +133,12 @@ export default function MyProfilePage() {
 
       {/* Profile Information Card */}
       <div className="bg-white rounded-[var(--radius-lg)] border border-border shadow-xs">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
           <h2 className="text-[15px] font-semibold text-text-primary">Profile Information</h2>
           <p className="text-[12px] text-text-tertiary mt-0.5">Update your personal details</p>
         </div>
 
-        <form onSubmit={handleProfileSave} className="px-6 py-5 space-y-5">
+        <form onSubmit={handleProfileSave} className="px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {profileError && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-100 rounded-[var(--radius-md)] text-[13px] text-danger-700">
               <X size={14} className="shrink-0 mt-0.5" />
@@ -196,12 +196,12 @@ export default function MyProfilePage() {
 
       {/* Change Password Card */}
       <div className="bg-white rounded-[var(--radius-lg)] border border-border shadow-xs">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
           <h2 className="text-[15px] font-semibold text-text-primary">Change Password</h2>
           <p className="text-[12px] text-text-tertiary mt-0.5">Update your account password</p>
         </div>
 
-        <form onSubmit={handlePasswordChange} className="px-6 py-5 space-y-5">
+        <form onSubmit={handlePasswordChange} className="px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {passwordError && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-100 rounded-[var(--radius-md)] text-[13px] text-danger-700">
               <X size={14} className="shrink-0 mt-0.5" />

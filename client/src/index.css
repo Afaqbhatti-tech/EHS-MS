@@ -228,3 +228,9 @@ html {
 .sidebar-drawer.closed {
   transform: translateX(-100%);
 }
+/* On lg+ screens, sidebar is static — never translate */
+@media (min-width: 1024px) {
+  .sidebar-drawer.closed {
+    transform: none;
+  }
+}

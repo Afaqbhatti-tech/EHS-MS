@@ -108,7 +108,7 @@ export default function RoleManagementPage() {
             return (
               <div
                 key={r.slug}
-                className="bg-surface rounded-[var(--radius-lg)] border border-border p-5 flex items-center gap-4 hover:border-primary-200 hover:shadow-sm transition-all duration-150"
+                className="bg-surface rounded-[var(--radius-lg)] border border-border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-primary-200 hover:shadow-sm transition-all duration-150"
               >
                 {/* Icon */}
                 <button
@@ -163,7 +163,7 @@ export default function RoleManagementPage() {
                 </button>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
                   {isMaster && (
                     <>
                       <button

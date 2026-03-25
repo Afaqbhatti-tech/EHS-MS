@@ -126,24 +126,25 @@ function MonolithStatCard({ stat }: { stat: DashboardStat }) {
   const sparkHeights = SPARK_PATTERNS[stat.key] || [40, 60, 50, 80, 70, 90, 100];
 
   return (
-    <div className="bg-surface p-5 rounded-[var(--radius-xl)] border border-border shadow-xs hover:shadow-md transition-all duration-300">
-      <div className="flex justify-between items-start mb-3">
-        <div className={`p-2 rounded-[var(--radius-md)] ${colors.icon}`}>
-          <Icon size={18} />
+    <div className="bg-surface p-3.5 sm:p-5 rounded-[var(--radius-xl)] border border-border shadow-xs hover:shadow-md transition-all duration-300 min-h-card">
+      <div className="flex justify-between items-start mb-2 sm:mb-3">
+        <div className={`p-1.5 sm:p-2 rounded-[var(--radius-md)] ${colors.icon}`}>
+          <Icon size={16} className="sm:hidden" />
+          <Icon size={18} className="hidden sm:block" />
         </div>
         {stat.trend && (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+          <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center gap-0.5 sm:gap-1 ${
             stat.trend.up ? 'bg-success-50 text-success-700' : 'bg-danger-50 text-danger-700'
           }`}>
-            {stat.trend.up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+            {stat.trend.up ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
             {stat.trend.value}
           </span>
         )}
       </div>
       <div className="space-y-0.5">
-        <p className="text-text-tertiary text-[11px] font-semibold uppercase tracking-wider">{stat.label}</p>
-        <h4 className="text-2xl font-bold text-text-primary tracking-tight">{stat.value}</h4>
-        {stat.sub && <p className="text-[11px] text-text-tertiary">{stat.sub}</p>}
+        <p className="text-text-tertiary text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate">{stat.label}</p>
+        <h4 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">{stat.value}</h4>
+        {stat.sub && <p className="text-[10px] sm:text-[11px] text-text-tertiary truncate">{stat.sub}</p>}
       </div>
       <MiniSparkBars heights={sparkHeights} color={stat.color} />
     </div>
@@ -216,38 +217,38 @@ export default function DashboardPage() {
   const topStats = stats.slice(0, 4);
 
   return (
-    <div className="space-y-8 max-w-[1440px]">
+    <div className="space-y-5 sm:space-y-8 max-w-[1440px]">
       {/* ── Welcome Header ──────────────────────────── */}
       <div>
-        <h3 className="text-[28px] font-extrabold text-text-primary tracking-tight mb-1">
+        <h3 className="text-[22px] sm:text-[28px] font-extrabold text-text-primary tracking-tight mb-1">
           {greeting}, {firstName}.
         </h3>
-        <p className="text-text-secondary text-[15px]">
+        <p className="text-text-secondary text-[13px] sm:text-[15px]">
           Your EHS performance overview for this month.
         </p>
       </div>
 
       {/* ── Summary Cards Bento Grid ────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
         {topStats.map((stat) => (
           <MonolithStatCard key={stat.key} stat={stat} />
         ))}
       </div>
 
       {/* ── Main Content Grid ───────────────────────── */}
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
 
-        {/* Analytics Chart (8 cols) */}
-        <div className="col-span-12 lg:col-span-8 bg-surface p-6 rounded-[var(--radius-xl)] border border-border shadow-xs">
-          <div className="flex justify-between items-center mb-8">
+        {/* Analytics Chart */}
+        <div className="lg:col-span-8 bg-surface p-4 sm:p-6 rounded-[var(--radius-xl)] border border-border shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
             <div>
-              <h3 className="text-[18px] font-bold text-text-primary">Safety Performance</h3>
-              <p className="text-text-secondary text-[13px]">Monthly observations & permit activity</p>
+              <h3 className="text-[16px] sm:text-[18px] font-bold text-text-primary">Safety Performance</h3>
+              <p className="text-text-secondary text-[12px] sm:text-[13px]">Monthly observations & permit activity</p>
             </div>
-            <div className="flex bg-surface-sunken p-1 rounded-[var(--radius-md)]">
+            <div className="flex bg-surface-sunken p-1 rounded-[var(--radius-md)] self-start">
               <button
                 onClick={() => setChartView('observations')}
-                className={`px-4 py-1.5 text-[12px] font-bold rounded-[var(--radius-sm)] transition-colors ${
+                className={`px-3 sm:px-4 py-1.5 text-[11px] sm:text-[12px] font-bold rounded-[var(--radius-sm)] transition-colors ${
                   chartView === 'observations' ? 'bg-surface shadow-xs text-primary-600' : 'text-text-secondary font-medium hover:text-primary-600'
                 }`}
               >
@@ -255,7 +256,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setChartView('permits')}
-                className={`px-4 py-1.5 text-[12px] font-bold rounded-[var(--radius-sm)] transition-colors ${
+                className={`px-3 sm:px-4 py-1.5 text-[11px] sm:text-[12px] font-bold rounded-[var(--radius-sm)] transition-colors ${
                   chartView === 'permits' ? 'bg-surface shadow-xs text-primary-600' : 'text-text-secondary font-medium hover:text-primary-600'
                 }`}
               >
@@ -273,8 +274,8 @@ export default function DashboardPage() {
           )}
 
           {/* Chart footer actions */}
-          <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
-            <div className="flex items-center gap-4 text-[12px] text-text-tertiary">
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-4 text-[11px] sm:text-[12px] text-text-tertiary">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm bg-primary-600" />
                 Current Month
@@ -284,17 +285,17 @@ export default function DashboardPage() {
                 Previous Months
               </span>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={() => navigate('/reports')}
-                className="flex items-center gap-2 px-4 py-2 text-[13px] font-semibold text-text-secondary hover:text-primary-600 transition-colors"
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-[12px] sm:text-[13px] font-semibold text-text-secondary hover:text-primary-600 transition-colors flex-1 sm:flex-none"
               >
                 <Download size={15} />
                 Export
               </button>
               <button
                 onClick={() => navigate('/reports')}
-                className="flex items-center gap-2 px-5 py-2 bg-primary-600 text-white text-[13px] font-bold rounded-[var(--radius-md)] shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2 bg-primary-600 text-white text-[12px] sm:text-[13px] font-bold rounded-[var(--radius-md)] shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex-1 sm:flex-none"
               >
                 <PlusCircle size={15} />
                 Create Report
@@ -303,8 +304,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column (4 cols) */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
+        {/* Right Column */}
+        <div className="lg:col-span-4 space-y-4 sm:space-y-6">
 
           {/* Quick Operations */}
           <div className="bg-surface-sunken p-5 rounded-[var(--radius-xl)]">
@@ -357,9 +358,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── AI Intelligence + Compliance ──────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
         {/* AI Panel (dark) */}
-        <div className="lg:col-span-3 bg-[#0F1623] rounded-[var(--radius-xl)] border border-white/[0.06] p-6 shadow-sm">
+        <div className="lg:col-span-3 bg-[#0F1623] rounded-[var(--radius-xl)] border border-white/[0.06] p-4 sm:p-6 shadow-sm">
           <div className="flex items-center gap-2.5 mb-1">
             <Brain size={18} className="text-primary-500" />
             <h3 className="text-[15px] font-semibold text-white">AI Intelligence</h3>
@@ -374,8 +375,17 @@ export default function DashboardPage() {
                   insight.severity === 'danger' ? 'bg-danger-500' :
                   insight.severity === 'warning' ? 'bg-warning-500' : 'bg-success-500'
                 }`} />
-                <p className="text-[13px] text-[#CBD5E1] leading-relaxed flex-1">{insight.text}</p>
-                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] sm:text-[13px] text-[#CBD5E1] leading-relaxed">{insight.text}</p>
+                  <span className={`inline-block mt-1 sm:hidden px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    insight.severity === 'danger' ? 'bg-danger-500/20 text-danger-500' :
+                    insight.severity === 'warning' ? 'bg-warning-500/20 text-warning-500' :
+                    'bg-success-500/20 text-success-500'
+                  }`}>
+                    {insight.severity === 'danger' ? 'Critical' : insight.severity === 'warning' ? 'Attention' : 'Positive'}
+                  </span>
+                </div>
+                <span className={`hidden sm:inline-block shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   insight.severity === 'danger' ? 'bg-danger-500/20 text-danger-500' :
                   insight.severity === 'warning' ? 'bg-warning-500/20 text-warning-500' :
                   'bg-success-500/20 text-success-500'
@@ -392,7 +402,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Compliance Scorecard */}
-        <div className="lg:col-span-2 bg-surface p-6 rounded-[var(--radius-xl)] border border-border shadow-xs">
+        <div className="lg:col-span-2 bg-surface p-4 sm:p-6 rounded-[var(--radius-xl)] border border-border shadow-xs">
           <h3 className="text-[15px] font-semibold text-text-primary mb-5">Compliance Scorecard</h3>
           <div className="space-y-5">
             {compliance.map((kpi) => {
@@ -426,9 +436,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Footer ──────────────────────────────────── */}
-      <footer className="pt-8 flex justify-between items-center text-text-tertiary text-[11px] font-medium tracking-widest uppercase">
+      <footer className="pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center gap-2 text-text-tertiary text-[10px] sm:text-[11px] font-medium tracking-widest uppercase">
         <p>&copy; {new Date().getFullYear()} EHS&middot;OS — KAEC Rail Project</p>
-        <div className="flex gap-6">
+        <div className="flex gap-4 sm:gap-6">
           <span className="hover:text-primary-600 transition-colors cursor-pointer">Privacy</span>
           <span className="hover:text-primary-600 transition-colors cursor-pointer">Terms</span>
           <span className="hover:text-primary-600 transition-colors cursor-pointer">Security</span>

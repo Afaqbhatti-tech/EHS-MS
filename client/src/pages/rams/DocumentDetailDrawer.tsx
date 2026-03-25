@@ -165,9 +165,9 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-surface shadow-xl overflow-y-auto">
+      <div className="relative w-full max-w-full sm:max-w-lg bg-surface shadow-xl overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-surface border-b border-border px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-[17px] font-bold text-text-primary">Document Details</h2>
           <button onClick={onClose} className="p-1 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-tertiary transition-colors duration-150">
             <X size={18} />
@@ -177,7 +177,7 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
         {isLoading && <PageSpinner label="Loading..." />}
 
         {doc && (
-          <div className="px-5 py-4 space-y-5">
+          <div className="px-4 sm:px-5 py-4 space-y-5">
             {/* Title & Ref */}
             <div>
               <div className="flex items-center gap-2 mb-1">

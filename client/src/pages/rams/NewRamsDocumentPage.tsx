@@ -132,7 +132,7 @@ export default function NewRamsDocumentPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Contractor</label>
             <select value={contractor} onChange={e => setContractor(e.target.value)} className={inputCls}>

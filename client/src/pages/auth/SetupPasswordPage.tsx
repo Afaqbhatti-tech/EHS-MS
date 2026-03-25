@@ -143,7 +143,7 @@ export default function SetupPasswordPage() {
       </div>
 
       {/* ── Right Panel ──────────────────────── */}
-      <div className="flex-1 flex items-center justify-center bg-canvas px-6 py-12">
+      <div className="flex-1 flex items-center justify-center bg-canvas px-4 sm:px-6 py-8 sm:py-12">
         <div className="w-full max-w-[420px]">
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-[30px] font-bold text-text-primary tracking-[-0.03em]">
@@ -151,7 +151,7 @@ export default function SetupPasswordPage() {
             </h1>
           </div>
 
-          <div className="bg-white rounded-[var(--radius-xl)] shadow-xl border border-border p-10">
+          <div className="bg-white rounded-[var(--radius-xl)] shadow-xl border border-border p-6 sm:p-10">
             {verifying ? (
               <div className="text-center py-8">
                 <div className="w-10 h-10 border-2 border-border border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />

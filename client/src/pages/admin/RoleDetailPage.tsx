@@ -187,13 +187,13 @@ export default function RoleDetailPage() {
   return (
     <div className="max-w-[1024px]">
       {/* Header */}
-      <div className="flex items-center gap-3 pb-6 mb-6 border-b border-border">
-        <button onClick={() => navigate('/admin/roles')} className="p-2 hover:bg-surface-sunken rounded-[var(--radius-sm)] transition-colors duration-150">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 sm:pb-6 mb-4 sm:mb-6 border-b border-border">
+        <button onClick={() => navigate('/admin/roles')} className="p-2 hover:bg-surface-sunken rounded-[var(--radius-sm)] transition-colors duration-150 self-start">
           <ArrowLeft size={18} className="text-text-secondary" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-[24px] leading-[32px] font-bold text-text-primary tracking-tight">{roleLabel}</h1>
+            <h1 className="text-[20px] sm:text-[24px] leading-[28px] sm:leading-[32px] font-bold text-text-primary tracking-tight">{roleLabel}</h1>
             {isMaster && (
               <Badge variant="warning">FULL ACCESS — All permissions always granted</Badge>
             )}
@@ -229,7 +229,7 @@ export default function RoleDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Permissions Panel */}
         <div className="lg:col-span-2 space-y-4">
           {PERMISSION_GROUPS.map(group => {

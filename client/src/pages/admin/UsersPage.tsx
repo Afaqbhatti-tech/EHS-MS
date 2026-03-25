@@ -142,7 +142,7 @@ export default function UsersPage() {
 
       {/* Setup link banner */}
       {setupLink && (
-        <div className="bg-info-50 border border-info-100 rounded-[var(--radius-md)] p-4 mb-5 flex items-center justify-between">
+        <div className="bg-info-50 border border-info-100 rounded-[var(--radius-md)] p-4 mb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium text-info-600 mb-1">Password Setup Link</p>
             <p className="text-[11px] text-info-600 truncate font-mono">{setupLink}</p>
@@ -160,7 +160,8 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <div className="bg-surface rounded-[var(--radius-lg)] shadow-sm border border-border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-surface-sunken border-b border-border">
@@ -224,6 +225,61 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card view */}
+        <div className="md:hidden">
+          {loading ? (
+            <PageSpinner label="Loading users..." />
+          ) : users.length === 0 ? (
+            <div className="text-center py-12 text-text-tertiary text-[13px]">No users found</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {users.map(u => (
+                <div key={u.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-text-primary truncate">{u.name}</p>
+                      <p className="text-[11px] text-text-tertiary truncate">{u.email}</p>
+                    </div>
+                    <Badge variant={u.isActive ? 'success' : 'danger'} dot>
+                      {u.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="primary">
+                      {roles.find(r => r.value === u.role)?.label || u.role}
+                    </Badge>
+                    {u.contractor && (
+                      <span className="text-[11px] text-text-tertiary">{u.contractor}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={() => { setEditingUser(u); setShowCreate(false); }}
+                      className="text-primary-600 hover:text-primary-700 text-[12px] font-medium"
+                    >
+                      Edit
+                    </button>
+                    {!u.passwordSet && (
+                      <button
+                        onClick={() => handleResendSetup(u.id)}
+                        className="inline-flex items-center gap-1 text-warning-600 hover:text-warning-700 text-[12px] font-medium"
+                      >
+                        <RefreshCw size={12} /> Setup Link
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleActive(u)}
+                      className={`text-[12px] font-medium ${u.isActive ? 'text-danger-600' : 'text-success-600'}`}
+                    >
+                      {u.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -361,7 +417,7 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Role</label>
             <select
@@ -405,7 +461,7 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
                 {PERMISSION_GROUPS.map(group => (
                   <div key={group.label}>
                     <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-2">{group.label}</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {group.perms.map(perm => (
                         <label key={perm} className="flex items-center gap-2 text-[13px] cursor-pointer">
                           <input

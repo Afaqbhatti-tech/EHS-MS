@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  LogOut, ChevronDown, Search,
+  LogOut, ChevronDown, Search, Menu,
   User, Shield, HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,7 +44,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/roles': 'Role Management',
 };
 
-export default function Header() {
+interface HeaderProps {
+  onToggleSidebar: () => void;
+}
+
+export default function Header({ onToggleSidebar }: HeaderProps) {
   const { user, logout, hasRole } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -69,14 +73,21 @@ export default function Header() {
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-border flex items-center justify-between px-8 shrink-0">
-        {/* Left — Page title */}
-        <div>
-          <h2 className="text-[17px] font-semibold text-text-primary leading-tight">{pageTitle}</h2>
+      <header className="h-14 sm:h-16 bg-white border-b border-border flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 gap-2">
+        {/* Left — Hamburger + Page title */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 -ml-1 rounded-[var(--radius-sm)] text-text-secondary hover:bg-surface-sunken transition-colors duration-150"
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={20} />
+          </button>
+          <h2 className="text-[15px] sm:text-[17px] font-semibold text-text-primary leading-tight truncate">{pageTitle}</h2>
         </div>
 
-        {/* Center — Global search */}
-        <div className="hidden md:flex items-center max-w-[400px] flex-1 mx-8">
+        {/* Center — Global search (hidden on mobile) */}
+        <div className="hidden md:flex items-center max-w-[400px] flex-1 mx-4 lg:mx-8">
           <div className="relative w-full">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input
@@ -91,9 +102,9 @@ export default function Header() {
         </div>
 
         {/* Right */}
-        <div className="flex items-center gap-3">
-          {/* Incident-free days */}
-          <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-success-50 text-success-700 border border-success-100">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Incident-free days — hidden below xl */}
+          <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-success-50 text-success-700 border border-success-100">
             <span className="w-1.5 h-1.5 rounded-full bg-success-500" />
             87 Incident-Free Days
           </span>
@@ -105,16 +116,16 @@ export default function Header() {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(v => !v)}
-              className="flex items-center gap-2.5 p-1.5 rounded-[var(--radius-md)] hover:bg-surface-sunken transition-colors duration-150"
+              className="flex items-center gap-1.5 sm:gap-2.5 p-1 sm:p-1.5 rounded-[var(--radius-md)] hover:bg-surface-sunken transition-colors duration-150"
             >
-              <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-[11px] font-bold text-white">
+              <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
                 {initials}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-[13px] font-medium text-text-primary leading-tight">{user?.name}</p>
                 <p className="text-[10px] text-text-tertiary">{ROLE_LABELS[user?.role || ''] || user?.role}</p>
               </div>
-              <ChevronDown size={14} className={`text-text-tertiary transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`hidden sm:block text-text-tertiary transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {menuOpen && (
@@ -137,7 +148,6 @@ export default function Header() {
 
                 {/* Menu items */}
                 <div className="py-1">
-                  {/* My Profile */}
                   <MenuItem
                     icon={<User size={15} />}
                     label="My Profile"
@@ -148,7 +158,6 @@ export default function Header() {
                     }}
                   />
 
-                  {/* Manage Roles — only visible to admins */}
                   {hasRole('master', 'system_admin', 'ehs_manager') && (
                     <MenuItem
                       icon={<Shield size={15} />}
@@ -161,7 +170,6 @@ export default function Header() {
                     />
                   )}
 
-                  {/* Help & Support */}
                   <MenuItem
                     icon={<HelpCircle size={15} />}
                     label="Help & Support"
