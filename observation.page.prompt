@@ -1,0 +1,2074 @@
+You are a senior full-stack engineer and UI/UX specialist.
+Your job is to build a complete Observation management page 
+inside an existing dashboard, and improve the overall dashboard 
+UI/UX with a modern green and white safety theme.
+
+Stack: React (frontend) + Laravel (backend API) + 
+       Plain CSS or existing CSS system + MySQL
+
+CRITICAL RULES — READ BEFORE ANYTHING:
+  ✦ Do NOT rewrite the whole app
+  ✦ Do NOT create new routing outside what exists
+  ✦ Do NOT duplicate the Observation menu item
+  ✦ Do NOT replace working functionality with stubs
+  ✦ ONLY modify existing components and extend them
+  ✦ Keep all existing branding, routes, and logic intact
+  ✦ Return production-ready code only — no placeholders,
+    no "TODO" comments, no incomplete logic
+  ✦ Every change must be backward compatible
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 0 — READ SKILL FILE + FULL INSPECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FIRST — read the frontend design skill:
+  /mnt/skills/public/frontend-design/SKILL.md
+Follow every instruction in that file exactly.
+
+THEN — fully inspect and map the entire project.
+Do NOT write code until inspection is done.
+
+FRONTEND INSPECTION:
+  1. Full directory tree (all folders, 3 levels deep)
+  2. Identify existing pages and routes:
+       - Where is the router configured?
+       - What route leads to the Observation page?
+       - What component renders when Observation is clicked?
+  3. Sidebar component:
+       - File location
+       - How menu items are defined
+       - How active state is set
+       - Where the Observation item lives
+  4. Dashboard layout:
+       - Main layout wrapper file
+       - How pages are injected into the layout
+       - Top header component
+  5. Existing Observation component/page:
+       - Current file location
+       - What currently renders
+       - Any existing state, hooks, or API calls
+  6. Styling system:
+       - Is it plain CSS / CSS modules / Tailwind / SCSS?
+       - Where are global styles defined?
+       - What CSS variables or theme tokens exist?
+       - What color variables are currently used?
+  7. Existing components:
+       - List all shared components (Button, Modal, Table,
+         Card, Input, Select, Badge, etc.)
+       - Which are reusable vs page-specific?
+  8. Charts library: Recharts / Chart.js / ApexCharts / other?
+  9. Form handling: plain state / React Hook Form / Formik?
+  10. HTTP client: Axios / Fetch? Where is baseURL set?
+  11. State management: Context / Redux / Zustand / none?
+  12. Any existing animation library: Framer Motion / AOS / none?
+
+BACKEND INSPECTION:
+  1. Laravel version (check composer.json)
+  2. API routes:
+       - Find routes/api.php
+       - List all existing /api/observation* routes
+  3. Existing models:
+       - Is there an Observation model?
+       - What columns does the observations table have?
+       - Run: find . -name "Observation.php" -path "*/Models/*"
+  4. Existing migrations:
+       - Find any observations migration
+       - Report all columns defined
+  5. Existing controller:
+       - Find ObservationController if it exists
+       - Report existing methods
+  6. Auth system:
+       - How is the logged-in user identified in API calls?
+       - JWT / Sanctum / Session?
+  7. Database:
+       - Check .env for DB_DATABASE, DB_USERNAME
+       - Do not expose passwords — just confirm DB is configured
+
+Report ALL findings clearly. Then write:
+"Inspection complete. Proceeding with implementation plan."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART A — GLOBAL DASHBOARD UI UPGRADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Improve the existing dashboard design system.
+Do NOT rebuild pages from scratch.
+Update the CSS variables, shared components, sidebar, 
+topbar, and card styles to match the new design direction.
+
+─── DESIGN DIRECTION ────────────────────────────────────────
+
+Theme: Modern Safety Green + White
+  Professional, clean, practical for daily EHS operations
+  Not corporate-boring. Not flashy startup.
+  Think: a tool field officers actually enjoy using.
+
+─── CSS DESIGN TOKENS ───────────────────────────────────────
+
+Locate the global CSS file (globals.css / index.css / 
+app.css / variables.css — whichever exists).
+Add or replace CSS custom properties in :root.
+
+DO NOT remove any existing variables that are used elsewhere.
+ADD new ones and REPLACE color values where safe:
+
+:root {
+
+  /* ── BACKGROUNDS ── */
+  --bg-base:          #F5FAF6;   /* page canvas, soft green-white */
+  --bg-surface:       #FFFFFF;   /* cards, panels */
+  --bg-sunken:        #EEF4EF;   /* input fills, code areas */
+  --bg-sidebar:       #0F2318;   /* deep forest sidebar */
+  --bg-overlay:       #FFFFFF;   /* modals, dropdowns */
+
+  /* ── BORDERS ── */
+  --border-subtle:    #D9E9DA;
+  --border-default:   #B8D4BA;
+  --border-strong:    #7BAE7F;
+
+  /* ── TEXT ── */
+  --text-primary:     #0D1F10;
+  --text-secondary:   #3D5C42;
+  --text-tertiary:    #7A9E7E;
+  --text-disabled:    #B0C8B3;
+  --text-inverse:     #F0FAF1;
+  --text-link:        #1A7A35;
+
+  /* ── PRIMARY GREEN ── */
+  --green-50:         #F0FAF1;
+  --green-100:        #D8F0DB;
+  --green-200:        #B0DEB5;
+  --green-400:        #4CAF60;
+  --green-500:        #2E9E45;   /* main brand green */
+  --green-600:        #1F8034;   /* buttons, links */
+  --green-700:        #166028;   /* hover */
+  --green-800:        #0F4A1E;   /* pressed */
+  --green-900:        #0A3316;   /* deep accent */
+
+  /* ── SIDEBAR ── */
+  --sidebar-bg:           #0F2318;
+  --sidebar-border:       rgba(255,255,255,0.07);
+  --sidebar-text:         #8EB897;
+  --sidebar-text-hover:   #C8DFCb;
+  --sidebar-hover-bg:     rgba(255,255,255,0.06);
+  --sidebar-active-bg:    rgba(46,158,69,0.18);
+  --sidebar-active-text:  #D8F0DB;
+  --sidebar-active-bar:   #4CAF60;
+  --sidebar-label:        #4A7050;
+
+  /* ── SEMANTIC ── */
+  --success-50:     #F0FDF4;
+  --success-500:    #22C55E;
+  --success-600:    #16A34A;
+  --success-700:    #15803D;
+
+  --warning-50:     #FFFBEB;
+  --warning-400:    #FBBF24;
+  --warning-500:    #F59E0B;
+  --warning-600:    #D97706;
+
+  --danger-50:      #FEF2F2;
+  --danger-500:     #EF4444;
+  --danger-600:     #DC2626;
+  --danger-700:     #B91C1C;
+
+  --info-50:        #F0F9FF;
+  --info-500:       #0EA5E9;
+  --info-600:       #0284C7;
+
+  /* ── OBSERVATION STATUS COLORS ── */
+  --status-open:         #DBEAFE;  /* light blue */
+  --status-open-text:    #1D4ED8;
+  --status-open-border:  #93C5FD;
+
+  --status-inprogress:        #FEF3C7;
+  --status-inprogress-text:   #92400E;
+  --status-inprogress-border: #FCD34D;
+
+  --status-closed:        #DCFCE7;
+  --status-closed-text:   #14532D;
+  --status-closed-border: #86EFAC;
+
+  --status-overdue:        #FEE2E2;
+  --status-overdue-text:   #991B1B;
+  --status-overdue-border: #FCA5A5;
+
+  /* ── TYPOGRAPHY ── */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont,
+                  'Segoe UI', sans-serif;
+  --text-xs:      11px;
+  --text-sm:      13px;
+  --text-base:    14px;
+  --text-md:      15px;
+  --text-lg:      17px;
+  --text-xl:      20px;
+  --text-2xl:     24px;
+  --text-3xl:     30px;
+
+  /* ── SPACING ── */
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;
+  --sp-4: 16px;  --sp-5: 20px;  --sp-6: 24px;
+  --sp-8: 32px;  --sp-10: 40px; --sp-12: 48px;
+
+  /* ── RADIUS ── */
+  --radius-xs:   3px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* ── SHADOWS ── */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07),
+               0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.07),
+               0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 24px rgba(0,0,0,0.08),
+               0 4px 8px rgba(0,0,0,0.04);
+  --shadow-xl: 0 24px 40px rgba(0,0,0,0.09),
+               0 8px 16px rgba(0,0,0,0.05);
+
+  /* ── TRANSITIONS ── */
+  --transition-fast:  100ms ease;
+  --transition-base:  160ms ease;
+  --transition-slow:  260ms ease-out;
+}
+
+─── SIDEBAR IMPROVEMENTS ────────────────────────────────────
+
+Find the existing sidebar component and improve it.
+DO NOT restructure the menu items — only restyle.
+
+Apply these styles to the existing sidebar:
+
+  background: var(--sidebar-bg)
+  border-right: 1px solid var(--sidebar-border)
+  width: 240px expanded, 60px collapsed
+
+  Logo/brand area:
+    height 60px, border-bottom var(--sidebar-border)
+    brand name: 15px, weight 700, var(--text-inverse)
+
+  Group labels:
+    11px, uppercase, letter-spacing 0.08em, weight 600
+    color: var(--sidebar-label)
+    padding: 18px 14px 6px
+
+  Nav items (normal):
+    padding: 8px 10px, margin: 0 8px
+    radius: var(--radius-sm)
+    icon: 16px, var(--sidebar-text)
+    label: 13px, weight 500, var(--sidebar-text)
+    transition: background var(--transition-fast),
+                color var(--transition-fast)
+
+  Nav items (hover):
+    background: var(--sidebar-hover-bg)
+    icon + label: var(--sidebar-text-hover)
+
+  Nav items (active):
+    background: var(--sidebar-active-bg)
+    border-left: 2px solid var(--sidebar-active-bar)
+    padding-left: 8px
+    label: var(--sidebar-active-text), weight 600
+    icon: var(--green-400)
+
+  Badge on nav item:
+    background: var(--danger-600), white text
+    10px, weight 700, radius var(--radius-full)
+    min-width 18px, height 18px, margin-left auto
+
+─── TOPBAR IMPROVEMENTS ─────────────────────────────────────
+
+  height: 60px
+  background: var(--bg-surface)
+  border-bottom: 1px solid var(--border-subtle)
+  padding: 0 24px
+  box-shadow: var(--shadow-xs)
+
+─── CARD IMPROVEMENTS ───────────────────────────────────────
+
+Update existing card styles:
+  background: var(--bg-surface)
+  border: 1px solid var(--border-subtle)
+  border-radius: var(--radius-md)
+  box-shadow: var(--shadow-sm)
+  padding: 20px 24px
+
+─── TYPOGRAPHY IMPROVEMENTS ─────────────────────────────────
+
+Add to body/global:
+  font-family: var(--font-sans)
+  font-size: var(--text-base)
+  color: var(--text-primary)
+  -webkit-font-smoothing: antialiased
+
+Load Inter from Google Fonts if not already loaded.
+Add to index.html or the main HTML entry point:
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?
+    family=Inter:wght@400;500;600;700&display=swap" 
+    rel="stylesheet">
+
+─── ANIMATIONS ──────────────────────────────────────────────
+
+Add these CSS keyframes to globals.css:
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.35s ease-out both;
+}
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out both;
+}
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out both;
+}
+
+/* Staggered KPI card animations */
+.kpi-card:nth-child(1) { animation-delay: 0ms; }
+.kpi-card:nth-child(2) { animation-delay: 60ms; }
+.kpi-card:nth-child(3) { animation-delay: 120ms; }
+.kpi-card:nth-child(4) { animation-delay: 180ms; }
+.kpi-card:nth-child(5) { animation-delay: 240ms; }
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-sunken) 25%,
+    var(--border-subtle) 50%,
+    var(--bg-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Chart entrance */
+.chart-container {
+  animation: fadeIn 0.4s ease-out 0.2s both;
+}
+
+ANIMATION RULES:
+  - All KPI cards: animate-fadeInUp with stagger
+  - Charts: fadeIn with 0.2s delay
+  - Drawers/modals: slideInRight or fadeIn
+  - Sidebar menu open/close: height/opacity transition
+  - Table rows: no animation (too many = janky)
+  - Status badge changes: color transition 160ms
+  - Buttons: transform + shadow on hover 150ms
+  - Keep will-change limited to animating elements only
+  - No layout-triggering animations (no width/height 
+    animation that causes CLS)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART B — DATABASE SCHEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Check if an observations table/migration already exists.
+
+IF it already exists:
+  Read the existing columns.
+  Create an ADDITIVE migration to add only missing columns.
+  Never drop existing columns.
+  Name the migration: add_missing_fields_to_observations_table
+
+IF it does not exist:
+  Create a fresh migration: create_observations_table
+
+Target schema (check which columns are missing and add them):
+
+Schema: observations table
+
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY
+  observation_id        VARCHAR(30) UNIQUE NOT NULL
+                        -- Format: OBS-YYYY-NNNN e.g. OBS-2026-0001
+                        -- Generated server-side on creation
+  
+  title                 VARCHAR(500) NOT NULL
+  description           TEXT NOT NULL
+  
+  observed_date         DATE NOT NULL
+  observed_time         TIME NOT NULL
+  observed_day          VARCHAR(10)
+                        -- Auto: Monday/Tuesday etc. stored for 
+                        -- filtering convenience
+  
+  reported_by           VARCHAR(255) NOT NULL
+                        -- Safety Officer name or user reference
+  reported_by_user_id   BIGINT UNSIGNED NULL
+                        REFERENCES users(id) ON DELETE SET NULL
+  
+  team_name             VARCHAR(255) NULL
+  supervisor_name       VARCHAR(255) NULL
+  manager_name          VARCHAR(255) NULL
+  responsible_person    VARCHAR(255) NULL
+                        -- Concerned person for action
+  
+  category              VARCHAR(100) NULL
+                        -- Unsafe Act / Unsafe Condition / 
+                        -- Positive / Housekeeping / Environment /
+                        -- Behavioural / Other
+  
+  priority              ENUM('Low','Medium','High','Critical') 
+                        DEFAULT 'Medium'
+  
+  status                ENUM('Open','In Progress','Closed','Overdue')
+                        DEFAULT 'Open'
+  
+  target_completion_date DATE NULL
+  actual_closure_date    DATE NULL
+  
+  corrective_measures    TEXT NULL
+  remarks               TEXT NULL
+  verified_by           VARCHAR(255) NULL
+  
+  before_photo          VARCHAR(1000) NULL
+                        -- file path / storage URL
+  after_photo           VARCHAR(1000) NULL
+  
+  is_overdue            TINYINT(1) DEFAULT 0
+                        -- 1 if past target date and not closed
+                        -- updated by scheduler or on read
+  
+  created_by            BIGINT UNSIGNED NULL
+                        REFERENCES users(id) ON DELETE SET NULL
+  updated_by            BIGINT UNSIGNED NULL
+                        REFERENCES users(id) ON DELETE SET NULL
+  
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+                        ON UPDATE CURRENT_TIMESTAMP
+  deleted_at            TIMESTAMP NULL
+                        -- soft delete
+
+  INDEXES:
+    INDEX idx_obs_status (status)
+    INDEX idx_obs_date (observed_date)
+    INDEX idx_obs_team (team_name)
+    INDEX idx_obs_reported_by (reported_by)
+    INDEX idx_obs_priority (priority)
+    INDEX idx_obs_category (category)
+
+OBSERVATION CATEGORIES (store as configurable, 
+  default options):
+  'Unsafe Act'
+  'Unsafe Condition'  
+  'Positive Observation'
+  'Housekeeping'
+  'Environmental'
+  'Behavioural'
+  'Work at Height'
+  'Lifting & Rigging'
+  'Near Miss'
+  'Property Damage'
+  'Other'
+
+After writing the migration:
+  Run: php artisan migrate
+  Confirm: "Migrated successfully"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART C — LARAVEL BACKEND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Check for existing Observation model and controller.
+Extend them if they exist. Create if they do not.
+
+─── MODEL: app/Models/Observation.php ───────────────────────
+
+<?php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
+
+class Observation extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'observation_id','title','description',
+        'observed_date','observed_time','observed_day',
+        'reported_by','reported_by_user_id',
+        'team_name','supervisor_name','manager_name',
+        'responsible_person','category','priority',
+        'status','target_completion_date',
+        'actual_closure_date','corrective_measures',
+        'remarks','verified_by','before_photo',
+        'after_photo','is_overdue','created_by','updated_by',
+    ];
+
+    protected $casts = [
+        'observed_date'          => 'date',
+        'target_completion_date' => 'date',
+        'actual_closure_date'    => 'date',
+        'is_overdue'             => 'boolean',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Observation $obs) {
+            // Auto-generate observation_id
+            if (empty($obs->observation_id)) {
+                $year  = now()->year;
+                $count = static::whereYear('created_at', $year)
+                               ->withTrashed()->count() + 1;
+                $obs->observation_id = 
+                    'OBS-' . $year . '-' . 
+                    str_pad($count, 4, '0', STR_PAD_LEFT);
+            }
+            // Auto-calculate day name
+            if ($obs->observed_date) {
+                $obs->observed_day = 
+                    Carbon::parse($obs->observed_date)
+                          ->format('l');
+            }
+        });
+
+        static::updating(function (Observation $obs) {
+            if ($obs->isDirty('observed_date') && 
+                $obs->observed_date) {
+                $obs->observed_day = 
+                    Carbon::parse($obs->observed_date)
+                          ->format('l');
+            }
+        });
+
+        static::saving(function (Observation $obs) {
+            // Auto-flag overdue
+            if (in_array($obs->status, ['Open', 'In Progress']) 
+                && $obs->target_completion_date
+                && now()->gt($obs->target_completion_date)) {
+                $obs->is_overdue = true;
+                if ($obs->status !== 'Closed') {
+                    $obs->status = 'Overdue';
+                }
+            }
+        });
+    }
+
+    // Scopes for filtering
+    public function scopeByStatus($query, $status) {
+        return $query->where('status', $status);
+    }
+
+    public function scopeByTeam($query, $team) {
+        return $query->where('team_name', $team);
+    }
+
+    public function scopeByDateRange($query, $from, $to) {
+        return $query->whereBetween('observed_date', 
+                                    [$from, $to]);
+    }
+
+    public function scopeOverdue($query) {
+        return $query->where('status', 'Overdue')
+                     ->orWhere(function($q) {
+                         $q->whereIn('status', 
+                                     ['Open','In Progress'])
+                           ->whereNotNull('target_completion_date')
+                           ->where('target_completion_date', '<', 
+                                   now()->toDateString());
+                     });
+    }
+}
+
+─── CONTROLLER: app/Http/Controllers/ObservationController.php
+
+If controller exists: add/replace methods listed below.
+If not: create the file.
+
+<?php
+namespace App\Http\Controllers;
+
+use App\Models\Observation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+
+class ObservationController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Observation::query();
+
+        // Text search
+        if ($search = $request->get('search')) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                  ->orWhere('description', 'like', "%$search%")
+                  ->orWhere('observation_id', 'like', "%$search%")
+                  ->orWhere('reported_by', 'like', "%$search%")
+                  ->orWhere('responsible_person', 'like', "%$search%");
+            });
+        }
+
+        // Status filter
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        // Category filter
+        if ($category = $request->get('category')) {
+            $query->where('category', $category);
+        }
+
+        // Priority filter
+        if ($priority = $request->get('priority')) {
+            $query->where('priority', $priority);
+        }
+
+        // Team filter
+        if ($team = $request->get('team_name')) {
+            $query->where('team_name', $team);
+        }
+
+        // Supervisor filter
+        if ($supervisor = $request->get('supervisor_name')) {
+            $query->where('supervisor_name', $supervisor);
+        }
+
+        // Manager filter
+        if ($manager = $request->get('manager_name')) {
+            $query->where('manager_name', $manager);
+        }
+
+        // Reported by filter
+        if ($reporter = $request->get('reported_by')) {
+            $query->where('reported_by', 'like', "%$reporter%");
+        }
+
+        // Date range
+        if ($from = $request->get('date_from')) {
+            $query->where('observed_date', '>=', $from);
+        }
+        if ($to = $request->get('date_to')) {
+            $query->where('observed_date', '<=', $to);
+        }
+
+        // Period shortcuts
+        if ($period = $request->get('period')) {
+            match($period) {
+                'today'     => $query->whereDate('observed_date', 
+                               today()),
+                'week'      => $query->whereBetween('observed_date',
+                               [now()->startOfWeek(), 
+                                now()->endOfWeek()]),
+                'month'     => $query->whereMonth('observed_date',
+                               now()->month)
+                                     ->whereYear('observed_date',
+                                     now()->year),
+                'year'      => $query->whereYear('observed_date',
+                               now()->year),
+                default     => null,
+            };
+        }
+
+        $observations = $query
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('per_page', 20));
+
+        return response()->json($observations);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'                  => 'required|string|max:500',
+            'description'            => 'required|string',
+            'observed_date'          => 'required|date',
+            'observed_time'          => 'required',
+            'reported_by'            => 'required|string|max:255',
+            'team_name'              => 'nullable|string|max:255',
+            'supervisor_name'        => 'nullable|string|max:255',
+            'manager_name'           => 'nullable|string|max:255',
+            'responsible_person'     => 'nullable|string|max:255',
+            'category'               => 'nullable|string|max:100',
+            'priority'               => 'nullable|in:Low,Medium,High,Critical',
+            'status'                 => 'nullable|in:Open,In Progress,Closed,Overdue',
+            'target_completion_date' => 'nullable|date|required_if:status,Open|required_if:status,In Progress',
+            'actual_closure_date'    => 'nullable|date|required_if:status,Closed',
+            'corrective_measures'    => 'nullable|string|required_if:status,Closed',
+            'remarks'                => 'nullable|string',
+            'verified_by'            => 'nullable|string|max:255',
+            'before_photo'           => 'nullable|image|max:5120',
+            'after_photo'            => 'nullable|image|max:5120',
+        ]);
+
+        $validated['created_by'] = Auth::id();
+        $validated['updated_by'] = Auth::id();
+
+        // Handle photo uploads
+        if ($request->hasFile('before_photo')) {
+            $validated['before_photo'] = $request
+                ->file('before_photo')
+                ->store('observations/photos', 'public');
+        }
+        if ($request->hasFile('after_photo')) {
+            $validated['after_photo'] = $request
+                ->file('after_photo')
+                ->store('observations/photos', 'public');
+        }
+
+        $observation = Observation::create($validated);
+
+        return response()->json([
+            'message'     => 'Observation created successfully',
+            'observation' => $observation,
+        ], 201);
+    }
+
+    public function show(Observation $observation)
+    {
+        return response()->json($observation);
+    }
+
+    public function update(Request $request, 
+                           Observation $observation)
+    {
+        $validated = $request->validate([
+            'title'                  => 'sometimes|string|max:500',
+            'description'            => 'sometimes|string',
+            'observed_date'          => 'sometimes|date',
+            'observed_time'          => 'sometimes',
+            'reported_by'            => 'sometimes|string|max:255',
+            'team_name'              => 'nullable|string|max:255',
+            'supervisor_name'        => 'nullable|string|max:255',
+            'manager_name'           => 'nullable|string|max:255',
+            'responsible_person'     => 'nullable|string|max:255',
+            'category'               => 'nullable|string|max:100',
+            'priority'               => 'nullable|in:Low,Medium,High,Critical',
+            'status'                 => 'nullable|in:Open,In Progress,Closed,Overdue',
+            'target_completion_date' => 'nullable|date',
+            'actual_closure_date'    => 'nullable|date',
+            'corrective_measures'    => 'nullable|string',
+            'remarks'                => 'nullable|string',
+            'verified_by'            => 'nullable|string|max:255',
+            'before_photo'           => 'nullable|image|max:5120',
+            'after_photo'            => 'nullable|image|max:5120',
+        ]);
+
+        $validated['updated_by'] = Auth::id();
+
+        if ($request->hasFile('before_photo')) {
+            if ($observation->before_photo) {
+                Storage::disk('public')
+                       ->delete($observation->before_photo);
+            }
+            $validated['before_photo'] = $request
+                ->file('before_photo')
+                ->store('observations/photos', 'public');
+        }
+
+        if ($request->hasFile('after_photo')) {
+            if ($observation->after_photo) {
+                Storage::disk('public')
+                       ->delete($observation->after_photo);
+            }
+            $validated['after_photo'] = $request
+                ->file('after_photo')
+                ->store('observations/photos', 'public');
+        }
+
+        $observation->update($validated);
+
+        return response()->json([
+            'message'     => 'Observation updated successfully',
+            'observation' => $observation->fresh(),
+        ]);
+    }
+
+    public function updateStatus(Request $request, 
+                                  Observation $observation)
+    {
+        $request->validate([
+            'status' => 'required|in:Open,In Progress,Closed,Overdue',
+            'actual_closure_date'  => 'nullable|date',
+            'corrective_measures'  => 'nullable|string',
+        ]);
+
+        $observation->update([
+            'status'               => $request->status,
+            'actual_closure_date'  => $request->actual_closure_date,
+            'corrective_measures'  => $request->corrective_measures,
+            'updated_by'           => Auth::id(),
+        ]);
+
+        return response()->json([
+            'message'     => 'Status updated',
+            'observation' => $observation->fresh(),
+        ]);
+    }
+
+    public function destroy(Observation $observation)
+    {
+        $observation->delete();
+        return response()->json(['message' => 'Deleted successfully']);
+    }
+
+    public function stats(Request $request)
+    {
+        $year  = $request->get('year', now()->year);
+        $month = $request->get('month', now()->month);
+
+        $base = Observation::whereYear('observed_date', $year);
+
+        // Monthly totals for chart
+        $monthly = Observation::selectRaw(
+            'MONTH(observed_date) as month,
+             COUNT(*) as total,
+             SUM(status = "Open") as open,
+             SUM(status = "In Progress") as in_progress,
+             SUM(status = "Closed") as closed,
+             SUM(status = "Overdue") as overdue'
+        )
+        ->whereYear('observed_date', $year)
+        ->groupBy('month')
+        ->orderBy('month')
+        ->get();
+
+        // By category
+        $byCategory = Observation::selectRaw(
+            'category, COUNT(*) as total'
+        )
+        ->whereYear('observed_date', $year)
+        ->groupBy('category')
+        ->get();
+
+        // By team
+        $byTeam = Observation::selectRaw(
+            'team_name, COUNT(*) as total'
+        )
+        ->whereYear('observed_date', $year)
+        ->whereNotNull('team_name')
+        ->groupBy('team_name')
+        ->get();
+
+        // By safety officer
+        $byOfficer = Observation::selectRaw(
+            'reported_by, COUNT(*) as total'
+        )
+        ->whereYear('observed_date', $year)
+        ->groupBy('reported_by')
+        ->orderByDesc('total')
+        ->limit(10)
+        ->get();
+
+        // KPI totals
+        $kpis = [
+            'total'       => Observation::count(),
+            'open'        => Observation::where('status','Open')
+                                        ->count(),
+            'in_progress' => Observation::where('status',
+                                         'In Progress')->count(),
+            'closed'      => Observation::where('status','Closed')
+                                        ->count(),
+            'overdue'     => Observation::where('status','Overdue')
+                                        ->count(),
+        ];
+
+        return response()->json(compact(
+            'kpis','monthly','byCategory','byTeam','byOfficer'
+        ));
+    }
+
+    public function export(Request $request)
+    {
+        // Returns CSV data for frontend download
+        $query = Observation::query();
+        
+        if ($from = $request->get('date_from')) {
+            $query->where('observed_date', '>=', $from);
+        }
+        if ($to = $request->get('date_to')) {
+            $query->where('observed_date', '<=', $to);
+        }
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+
+        $observations = $query->orderBy('observed_date','desc')
+                              ->get();
+
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 
+                'attachment; filename="observations_' . 
+                now()->format('Y-m-d') . '.csv"',
+        ];
+
+        $callback = function() use ($observations) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Observation ID','Date','Day','Time','Title',
+                'Description','Reported By','Team','Supervisor',
+                'Manager','Responsible Person','Category',
+                'Priority','Status','Target Date','Closed Date',
+                'Corrective Measures','Remarks','Verified By',
+                'Created At',
+            ]);
+            foreach ($observations as $obs) {
+                fputcsv($handle, [
+                    $obs->observation_id,
+                    $obs->observed_date?->format('Y-m-d'),
+                    $obs->observed_day,
+                    $obs->observed_time,
+                    $obs->title,
+                    $obs->description,
+                    $obs->reported_by,
+                    $obs->team_name,
+                    $obs->supervisor_name,
+                    $obs->manager_name,
+                    $obs->responsible_person,
+                    $obs->category,
+                    $obs->priority,
+                    $obs->status,
+                    $obs->target_completion_date?->format('Y-m-d'),
+                    $obs->actual_closure_date?->format('Y-m-d'),
+                    $obs->corrective_measures,
+                    $obs->remarks,
+                    $obs->verified_by,
+                    $obs->created_at?->format('Y-m-d H:i'),
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+}
+
+─── ROUTES: routes/api.php ──────────────────────────────────
+
+Add these routes. Do NOT remove existing routes.
+Wrap in auth middleware that matches your existing pattern:
+
+// Find existing auth middleware name — 
+// common options: 'auth:sanctum', 'auth:api', 'auth'
+// Use whichever your project already uses
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/observations',          
+        [ObservationController::class, 'index']);
+    Route::post('/observations',         
+        [ObservationController::class, 'store']);
+    Route::get('/observations/stats',    
+        [ObservationController::class, 'stats']);
+    Route::get('/observations/export',   
+        [ObservationController::class, 'export']);
+    Route::get('/observations/{observation}',   
+        [ObservationController::class, 'show']);
+    Route::put('/observations/{observation}',   
+        [ObservationController::class, 'update']);
+    Route::patch('/observations/{observation}/status', 
+        [ObservationController::class, 'updateStatus']);
+    Route::delete('/observations/{observation}', 
+        [ObservationController::class, 'destroy']);
+});
+
+After adding routes:
+  php artisan route:list | grep observation
+  Confirm all 8 routes are listed.
+  php artisan config:clear && php artisan route:clear
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART D — REACT FRONTEND: OBSERVATION PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Find the existing Observation page component.
+Extend it completely. Do not create a parallel component.
+
+─── FILE STRUCTURE TO CREATE/UPDATE ─────────────────────────
+
+Within the existing frontend src structure:
+
+  src/pages/Observation/             (or existing path)
+  ├── ObservationPage.jsx            ← main page (extend this)
+  ├── ObservationPage.css            ← styles
+  ├── components/
+  │   ├── ObservationKPICards.jsx
+  │   ├── ObservationFilters.jsx
+  │   ├── ObservationTable.jsx
+  │   ├── ObservationForm.jsx        ← drawer/modal
+  │   ├── ObservationDetail.jsx      ← detail view drawer
+  │   ├── ObservationCharts.jsx      ← analytics section
+  │   └── StatusBadge.jsx
+  └── hooks/
+      └── useObservations.js         ← API hook
+
+─── CUSTOM HOOK: useObservations.js ─────────────────────────
+
+import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+
+const API = '/api/observations';
+
+export function useObservations() {
+    const [observations, setObservations] = useState([]);
+    const [stats, setStats]               = useState(null);
+    const [loading, setLoading]           = useState(false);
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [error, setError]               = useState(null);
+    const [pagination, setPagination]     = useState({});
+
+    const [filters, setFilters] = useState({
+        search:          '',
+        status:          '',
+        category:        '',
+        priority:        '',
+        team_name:       '',
+        supervisor_name: '',
+        manager_name:    '',
+        reported_by:     '',
+        period:          '',
+        date_from:       '',
+        date_to:         '',
+        per_page:        20,
+        page:            1,
+    });
+
+    const fetchObservations = useCallback(async (params) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const cleanParams = Object.fromEntries(
+                Object.entries(params).filter(([,v]) => v !== '')
+            );
+            const { data } = await axios.get(API, { 
+                params: cleanParams 
+            });
+            setObservations(data.data || data);
+            setPagination({
+                currentPage:  data.current_page,
+                lastPage:     data.last_page,
+                total:        data.total,
+                perPage:      data.per_page,
+            });
+        } catch (err) {
+            setError(err.response?.data?.message || 
+                     'Failed to load observations');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const fetchStats = useCallback(async () => {
+        setStatsLoading(true);
+        try {
+            const { data } = await axios.get(`${API}/stats`);
+            setStats(data);
+        } catch (err) {
+            console.error('Stats fetch error:', err);
+        } finally {
+            setStatsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchObservations(filters);
+    }, [filters, fetchObservations]);
+
+    useEffect(() => {
+        fetchStats();
+    }, [fetchStats]);
+
+    const createObservation = async (formData) => {
+        const { data } = await axios.post(API, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        await fetchObservations(filters);
+        await fetchStats();
+        return data;
+    };
+
+    const updateObservation = async (id, formData) => {
+        formData.append('_method', 'PUT');
+        const { data } = await axios.post(`${API}/${id}`, 
+            formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        await fetchObservations(filters);
+        await fetchStats();
+        return data;
+    };
+
+    const updateStatus = async (id, statusData) => {
+        const { data } = await axios.patch(
+            `${API}/${id}/status`, statusData
+        );
+        setObservations(prev => prev.map(obs => 
+            obs.id === id ? data.observation : obs
+        ));
+        await fetchStats();
+        return data;
+    };
+
+    const deleteObservation = async (id) => {
+        await axios.delete(`${API}/${id}`);
+        await fetchObservations(filters);
+        await fetchStats();
+    };
+
+    const exportCSV = async (exportFilters = {}) => {
+        const params = new URLSearchParams(
+            Object.fromEntries(
+                Object.entries({...filters, ...exportFilters})
+                      .filter(([,v]) => v !== '')
+            )
+        );
+        window.location.href = 
+            `${API}/export?${params.toString()}`;
+    };
+
+    return {
+        observations, stats, loading, statsLoading,
+        error, pagination, filters, setFilters,
+        createObservation, updateObservation,
+        updateStatus, deleteObservation, exportCSV,
+        refresh: () => {
+            fetchObservations(filters);
+            fetchStats();
+        },
+    };
+}
+
+─── KPI CARDS: ObservationKPICards.jsx ──────────────────────
+
+import React from 'react';
+
+const KPI_CONFIG = [
+    { 
+        key: 'total', 
+        label: 'Total Observations', 
+        icon: '📋', 
+        color: 'var(--green-600)',
+        bg: 'var(--green-50)',
+        border: 'var(--green-200)',
+    },
+    { 
+        key: 'open', 
+        label: 'Open', 
+        icon: '🔵',
+        color: 'var(--status-open-text)',
+        bg: 'var(--status-open)',
+        border: 'var(--status-open-border)',
+    },
+    { 
+        key: 'in_progress', 
+        label: 'In Progress', 
+        icon: '🟡',
+        color: 'var(--status-inprogress-text)',
+        bg: 'var(--status-inprogress)',
+        border: 'var(--status-inprogress-border)',
+    },
+    { 
+        key: 'closed', 
+        label: 'Closed', 
+        icon: '🟢',
+        color: 'var(--status-closed-text)',
+        bg: 'var(--status-closed)',
+        border: 'var(--status-closed-border)',
+    },
+    { 
+        key: 'overdue', 
+        label: 'Overdue', 
+        icon: '🔴',
+        color: 'var(--status-overdue-text)',
+        bg: 'var(--status-overdue)',
+        border: 'var(--status-overdue-border)',
+    },
+];
+
+export function ObservationKPICards({ kpis, loading }) {
+    if (loading) {
+        return (
+            <div className="kpi-grid">
+                {KPI_CONFIG.map((_, i) => (
+                    <div key={i} className="kpi-card kpi-skeleton">
+                        <div className="skeleton" 
+                             style={{height:20,width:'40%',
+                                     marginBottom:12}} />
+                        <div className="skeleton" 
+                             style={{height:36,width:'60%'}} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="kpi-grid">
+            {KPI_CONFIG.map((cfg, i) => (
+                <div
+                    key={cfg.key}
+                    className="kpi-card animate-fadeInUp"
+                    style={{
+                        backgroundColor: cfg.bg,
+                        borderColor: cfg.border,
+                        animationDelay: `${i * 60}ms`,
+                    }}
+                >
+                    <div className="kpi-card__header">
+                        <span className="kpi-card__icon">
+                            {cfg.icon}
+                        </span>
+                        <span className="kpi-card__label">
+                            {cfg.label}
+                        </span>
+                    </div>
+                    <div 
+                        className="kpi-card__value"
+                        style={{ color: cfg.color }}
+                    >
+                        {kpis?.[cfg.key] ?? '—'}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+─── STATUS BADGE: StatusBadge.jsx ───────────────────────────
+
+import React from 'react';
+
+const STATUS_STYLES = {
+    'Open': {
+        background: 'var(--status-open)',
+        color: 'var(--status-open-text)',
+        border: '1px solid var(--status-open-border)',
+    },
+    'In Progress': {
+        background: 'var(--status-inprogress)',
+        color: 'var(--status-inprogress-text)',
+        border: '1px solid var(--status-inprogress-border)',
+    },
+    'Closed': {
+        background: 'var(--status-closed)',
+        color: 'var(--status-closed-text)',
+        border: '1px solid var(--status-closed-border)',
+    },
+    'Overdue': {
+        background: 'var(--status-overdue)',
+        color: 'var(--status-overdue-text)',
+        border: '1px solid var(--status-overdue-border)',
+    },
+};
+
+const PRIORITY_STYLES = {
+    'Low':      { background: '#F0F9FF', color: '#0369A1',
+                  border: '1px solid #BAE6FD' },
+    'Medium':   { background: '#FFFBEB', color: '#92400E',
+                  border: '1px solid #FCD34D' },
+    'High':     { background: '#FEF3C7', color: '#92400E',
+                  border: '1px solid #FCD34D' },
+    'Critical': { background: '#FEE2E2', color: '#991B1B',
+                  border: '1px solid #FCA5A5' },
+};
+
+export function StatusBadge({ status }) {
+    const style = STATUS_STYLES[status] || {};
+    return (
+        <span style={{
+            ...style,
+            padding: '3px 9px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: 'var(--text-xs)',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            display: 'inline-block',
+            transition: 'all var(--transition-base)',
+        }}>
+            {status}
+        </span>
+    );
+}
+
+export function PriorityBadge({ priority }) {
+    const style = PRIORITY_STYLES[priority] || {};
+    return (
+        <span style={{
+            ...style,
+            padding: '3px 9px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: 'var(--text-xs)',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            display: 'inline-block',
+        }}>
+            {priority}
+        </span>
+    );
+}
+
+─── FILTERS: ObservationFilters.jsx ─────────────────────────
+
+Build a clean, collapsible filter bar with these elements:
+
+  Row 1 (always visible):
+    [ 🔍 Search input, width 260px ]
+    [ Status dropdown ]
+    [ Priority dropdown ]
+    [ Period quick-select: Today/Week/Month/Year ]
+    [ + More Filters toggle button ]
+    [ Export CSV button (right-aligned) ]
+
+  Row 2 (expanded when More Filters clicked):
+    [ Date From ] [ Date To ]
+    [ Team Name input/select ]
+    [ Supervisor input ]
+    [ Manager input ]
+    [ Category dropdown ]
+    [ Reported By input ]
+    [ Clear Filters button ]
+
+Period quick-select chips:
+  Render as small pill buttons:
+    '' / 'today' / 'week' / 'month' / 'year'
+  Active chip: var(--green-600) bg, white text
+  Others: white bg, var(--border-default) border
+
+Dropdown options:
+  Status: All Statuses / Open / In Progress / 
+          Closed / Overdue
+  Priority: All Priorities / Low / Medium / High / Critical
+  Category: All Categories + the 11 observation categories
+
+Props: { filters, onFilterChange, onExport, loading }
+
+Filter row CSS:
+  display: flex
+  flex-wrap: wrap
+  gap: 10px
+  align-items: center
+  padding: 16px 0
+  border-bottom: 1px solid var(--border-subtle)
+  margin-bottom: 16px
+
+  On mobile (<640px): stack vertically, inputs full-width
+
+─── TABLE: ObservationTable.jsx ─────────────────────────────
+
+Build a complete, responsive table component.
+
+COLUMNS (in order):
+  1.  # / ID (observation_id)
+  2.  Date + Day (combined: "15 Mar\nMonday")
+  3.  Time
+  4.  Title (max 200px, truncate with tooltip)
+  5.  Reported By
+  6.  Team
+  7.  Category
+  8.  Priority (PriorityBadge)
+  9.  Status (StatusBadge + quick-change dropdown)
+  10. Responsible Person
+  11. Target Date (red text if overdue)
+  12. Actions (View / Edit / Delete icons)
+
+TABLE STYLING:
+  Container:
+    background: var(--bg-surface)
+    border: 1px solid var(--border-subtle)
+    border-radius: var(--radius-md)
+    box-shadow: var(--shadow-sm)
+    overflow: hidden
+    margin-top: 0
+
+  Header row:
+    background: var(--bg-sunken)
+    border-bottom: 2px solid var(--border-subtle)
+    th: 11px, uppercase, letter-spacing 0.06em, 
+        weight 600, var(--text-tertiary)
+        padding: 11px 14px
+
+  Body rows:
+    td: 13px, var(--text-primary), padding: 13px 14px
+    border-bottom: 1px solid var(--border-subtle)
+    transition: background var(--transition-fast)
+    hover: background var(--bg-sunken)
+
+  OVERDUE ROW HIGHLIGHT:
+    When status === 'Overdue':
+      background: rgba(239,68,68,0.04)
+      border-left: 3px solid var(--danger-500)
+    The Target Date cell: color var(--danger-600), weight 600
+
+  Quick status update:
+    Status cell contains StatusBadge.
+    On click: show small inline dropdown with status options.
+    On select: call updateStatus(id, { status: newStatus })
+    Show brief loading state during API call.
+
+  Empty state (no records):
+    Centered content, padding 60px 0
+    Icon: 48px, var(--text-tertiary)
+    "No observations found" — 15px, weight 600
+    "Try adjusting your filters" — 13px, var(--text-tertiary)
+    "Add Observation" button below
+
+  Loading skeleton: show 5 skeleton rows while loading
+
+  Mobile behavior (<768px):
+    Hide columns: Time, Manager, Responsible Person
+    Make table horizontally scrollable inside wrapper
+    wrapper: overflow-x: auto, -webkit-overflow-scrolling: touch
+
+  Pagination:
+    Below table, border-top: 1px var(--border-subtle)
+    padding: 14px 16px
+    "Showing X–Y of Z results" left
+    Previous/Next + page numbers right
+    Active page: var(--green-600) bg, white
+
+─── FORM: ObservationForm.jsx ───────────────────────────────
+
+Slide-in drawer from right. Width 520px desktop, 
+100% mobile.
+
+DRAWER STRUCTURE:
+  Overlay: rgba(0,0,0,0.4), backdrop-filter blur(2px)
+  Drawer: position fixed, right 0, top 0, height 100vh
+          background var(--bg-surface)
+          border-left: 1px var(--border-subtle)
+          box-shadow: var(--shadow-xl)
+          overflow-y: auto
+
+  Entry animation: translateX(100%) → translateX(0)
+                   260ms ease-out
+  Exit: reverse, 180ms ease-in
+
+DRAWER HEADER:
+  "Add Observation" or "Edit Observation" (h2)
+  Close button (×) top-right
+  border-bottom: 1px var(--border-subtle)
+  padding: 20px 24px
+
+FORM SECTIONS:
+
+  Section 1 — Identification (auto-generated, read-only):
+    Observation ID: [OBS-2026-XXXX] — auto, greyed input
+    Date + Time: side by side (required)
+    Day: auto-calculated from date, readonly
+
+  Section 2 — Observation Details:
+    Title (required, full-width)
+    Description (required, textarea min-height 100px)
+    Category (select dropdown)
+    Priority (select: Low/Medium/High/Critical)
+
+  Section 3 — People:
+    Reported By (required)
+    Responsible Team
+    Supervisor Name
+    Manager Name
+    Responsible / Concerned Person
+
+  Section 4 — Status & Dates:
+    Status (select)
+    Target Completion Date 
+      (required when status = Open or In Progress)
+    Actual Closure Date 
+      (required when status = Closed)
+    Corrective Measures 
+      (textarea, required when status = Closed)
+    Remarks (textarea, optional)
+    Verified By (optional)
+
+  Section 5 — Photos:
+    Before Rectification Photo (file input)
+      Accept: image/*, max 5MB
+      Show preview thumbnail after selection
+    After Rectification Photo (file input)
+      Same as above
+
+FORM VALIDATION (client-side, before API call):
+  Show inline error below each invalid field
+  
+  Rules:
+    title: required, min 3 chars
+    description: required, min 10 chars
+    observed_date: required
+    observed_time: required
+    reported_by: required
+    target_completion_date: required if status is 
+      'Open' or 'In Progress'
+    actual_closure_date: required if status is 'Closed'
+    corrective_measures: required if status is 'Closed'
+
+FORM FOOTER:
+  border-top: 1px var(--border-subtle)
+  padding: 16px 24px
+  right-aligned: [Cancel] [Save Observation]
+  Loading state on Save button during API call
+
+─── DETAIL VIEW: ObservationDetail.jsx ──────────────────────
+
+Full-width drawer or modal showing complete observation.
+
+SECTIONS:
+
+  Header:
+    Observation ID + StatusBadge + PriorityBadge
+    Title (large, bold)
+    "Observed on [Date] [Day] at [Time]" (secondary text)
+    Edit button (if user has permission)
+
+  Grid section (2-column on desktop, 1 on mobile):
+    Reported By | Team Name
+    Supervisor | Manager
+    Responsible Person | Category
+    Target Date | Closure Date
+    Verified By | Last Updated
+
+  Description:
+    Full description text, proper line-height
+
+  Corrective Measures:
+    Shown only if filled. Label + full text.
+
+  Remarks:
+    Shown only if filled.
+
+  Photos section:
+    Before and After photos side by side
+    Thumbnails: 200px × 150px, object-cover, radius md
+    Click to open full-size (lightbox or new tab)
+    Label above each: "Before Rectification" / 
+                      "After Rectification"
+    Show "No photo" placeholder if empty
+
+  Audit Trail:
+    "Created by [name] on [date]"
+    "Last updated by [name] on [date]"
+    Small, var(--text-tertiary), bottom of detail
+
+─── CHARTS: ObservationCharts.jsx ───────────────────────────
+
+Use the existing chart library (check inspection findings).
+If Recharts: use Recharts components
+If Chart.js: use react-chartjs-2
+If ApexCharts: use apexcharts
+If none installed: use Recharts 
+  (add to package.json: npm install recharts)
+
+Build an analytics section with TABS:
+  Tab 1: Overview
+  Tab 2: By Category & Priority  
+  Tab 3: By Team & Officer
+
+TAB 1 — Overview:
+  Row 1 (2 charts side by side):
+    Chart A: Monthly Observation Trend (Line chart)
+      X-axis: months, Y-axis: count
+      Lines: Total (green) / Open (blue) / Closed (grey)
+      
+    Chart B: Status Distribution (Donut chart)
+      Segments: Open/In Progress/Closed/Overdue
+      Colors: match status colors
+
+  Row 2 (1 chart full-width):
+    Chart C: Weekly Observations (Bar chart)
+      Last 12 weeks
+      Bars: green for closed, red for overdue
+
+TAB 2 — By Category:
+  Chart D: Observations by Category (Horizontal bar)
+    Bars colored with --green-500
+    Sorted by count descending
+
+  Chart E: Priority Distribution (Bar chart)
+    Low/Medium/High/Critical with semantic colors
+
+TAB 3 — By Team:
+  Chart F: Observations by Team (Bar chart)
+    --green-600 bars
+
+  Chart G: Top 10 Safety Officers by submissions (Bar)
+    Horizontal, ranked
+
+CHART STYLING:
+  All charts:
+    background: var(--bg-surface)
+    border: 1px solid var(--border-subtle)
+    border-radius: var(--radius-md)
+    padding: 20px 16px
+    box-shadow: var(--shadow-sm)
+
+  All text: var(--text-secondary), var(--font-sans), 13px
+  Grid lines: var(--border-subtle)
+  Animation: CSS fadeIn 0.4s 0.2s both (chart-container class)
+
+─── MAIN PAGE: ObservationPage.jsx ──────────────────────────
+
+Extend the EXISTING Observation page file.
+Replace the current content (keep routing and imports).
+
+Structure:
+
+import { useState } from 'react';
+import { useObservations } from './hooks/useObservations';
+import { ObservationKPICards } from './components/ObservationKPICards';
+import { ObservationFilters } from './components/ObservationFilters';
+import { ObservationTable } from './components/ObservationTable';
+import { ObservationForm } from './components/ObservationForm';
+import { ObservationDetail } from './components/ObservationDetail';
+import { ObservationCharts } from './components/ObservationCharts';
+
+export default function ObservationPage() {
+    const [activeTab, setActiveTab] = useState('list'); 
+    // 'list' | 'analytics'
+    const [showForm, setShowForm] = useState(false);
+    const [editingObs, setEditingObs] = useState(null);
+    const [viewingObs, setViewingObs] = useState(null);
+
+    const {
+        observations, stats, loading, statsLoading,
+        error, pagination, filters, setFilters,
+        createObservation, updateObservation,
+        updateStatus, deleteObservation, exportCSV,
+        refresh,
+    } = useObservations();
+
+    const handleAddNew = () => {
+        setEditingObs(null);
+        setShowForm(true);
+    };
+
+    const handleEdit = (obs) => {
+        setEditingObs(obs);
+        setShowForm(true);
+    };
+
+    const handleView = (obs) => {
+        setViewingObs(obs);
+    };
+
+    const handleFormSubmit = async (formData) => {
+        if (editingObs) {
+            await updateObservation(editingObs.id, formData);
+        } else {
+            await createObservation(formData);
+        }
+        setShowForm(false);
+        setEditingObs(null);
+    };
+
+    return (
+        <div className="obs-page">
+            
+            {/* PAGE HEADER */}
+            <div className="obs-page__header">
+                <div>
+                    <h1 className="obs-page__title">
+                        Daily EHS Observations
+                    </h1>
+                    <p className="obs-page__subtitle">
+                        Track, manage, and close site safety 
+                        observations
+                    </p>
+                </div>
+                <div className="obs-page__actions">
+                    <button 
+                        className="btn btn-secondary"
+                        onClick={() => exportCSV()}
+                    >
+                        Export CSV
+                    </button>
+                    <button 
+                        className="btn btn-primary"
+                        onClick={handleAddNew}
+                    >
+                        + Add Observation
+                    </button>
+                </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <ObservationKPICards 
+                kpis={stats?.kpis} 
+                loading={statsLoading} 
+            />
+
+            {/* TAB NAVIGATION */}
+            <div className="obs-tabs">
+                <button 
+                    className={`obs-tab ${
+                        activeTab === 'list' ? 'active' : ''
+                    }`}
+                    onClick={() => setActiveTab('list')}
+                >
+                    Observation List
+                </button>
+                <button 
+                    className={`obs-tab ${
+                        activeTab === 'analytics' ? 'active' : ''
+                    }`}
+                    onClick={() => setActiveTab('analytics')}
+                >
+                    Analytics & Charts
+                </button>
+            </div>
+
+            {/* TAB CONTENT */}
+            {activeTab === 'list' && (
+                <>
+                    <ObservationFilters
+                        filters={filters}
+                        onFilterChange={(key, val) => 
+                            setFilters(prev => ({
+                                ...prev, 
+                                [key]: val, 
+                                page: 1,
+                            }))
+                        }
+                        onExport={exportCSV}
+                        loading={loading}
+                    />
+                    {error && (
+                        <div className="obs-error">
+                            {error}
+                            <button onClick={refresh}>Retry</button>
+                        </div>
+                    )}
+                    <ObservationTable
+                        observations={observations}
+                        loading={loading}
+                        pagination={pagination}
+                        onPageChange={(page) => 
+                            setFilters(prev => ({...prev, page}))
+                        }
+                        onView={handleView}
+                        onEdit={handleEdit}
+                        onDelete={deleteObservation}
+                        onStatusChange={updateStatus}
+                    />
+                </>
+            )}
+
+            {activeTab === 'analytics' && (
+                <ObservationCharts 
+                    stats={stats} 
+                    loading={statsLoading} 
+                />
+            )}
+
+            {/* FORM DRAWER */}
+            {showForm && (
+                <ObservationForm
+                    observation={editingObs}
+                    onSubmit={handleFormSubmit}
+                    onClose={() => {
+                        setShowForm(false);
+                        setEditingObs(null);
+                    }}
+                />
+            )}
+
+            {/* DETAIL DRAWER */}
+            {viewingObs && (
+                <ObservationDetail
+                    observation={viewingObs}
+                    onClose={() => setViewingObs(null)}
+                    onEdit={() => {
+                        setEditingObs(viewingObs);
+                        setViewingObs(null);
+                        setShowForm(true);
+                    }}
+                />
+            )}
+
+        </div>
+    );
+}
+
+─── CSS: ObservationPage.css ────────────────────────────────
+
+Write all styles using CSS custom properties (tokens).
+No hardcoded colors. No !important unless fixing 
+existing conflicts.
+
+Key classes to define:
+
+.obs-page {
+    padding: 0;
+    background: var(--bg-base);
+    min-height: 100%;
+}
+
+.obs-page__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--sp-6);
+    padding-bottom: var(--sp-6);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.obs-page__title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.obs-page__subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+}
+
+.obs-page__actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* KPI Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-base),
+                transform var(--transition-base);
+}
+
+.kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.kpi-card__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.kpi-card__icon {
+    font-size: 16px;
+}
+
+.kpi-card__label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.kpi-card__value {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    line-height: 1;
+    animation: countUp 0.4s ease-out both;
+}
+
+/* Tabs */
+.obs-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: var(--sp-5);
+    border-bottom: 2px solid var(--border-subtle);
+}
+
+.obs-tab {
+    padding: 10px 20px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-tertiary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color var(--transition-base),
+                border-color var(--transition-base);
+}
+
+.obs-tab:hover {
+    color: var(--text-primary);
+}
+
+.obs-tab.active {
+    color: var(--green-600);
+    border-bottom-color: var(--green-600);
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all var(--transition-base);
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: var(--green-600);
+    color: white;
+    box-shadow: var(--shadow-xs);
+}
+.btn-primary:hover {
+    background: var(--green-700);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+}
+.btn-secondary:hover {
+    background: var(--bg-sunken);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .obs-page__header { flex-direction: column; }
+    .obs-page__actions { width: 100%; justify-content: flex-end; }
+}
+@media (max-width: 480px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .obs-page__title { font-size: var(--text-xl); }
+}
+
+/* Table wrapper mobile scroll */
+.obs-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+}
+
+/* Drawer overlay */
+.drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.42);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    animation: fadeIn 0.2s ease-out both;
+}
+
+.drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 520px;
+    max-width: 100vw;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-xl);
+    z-index: 101;
+    overflow-y: auto;
+    animation: slideInRight 0.26s ease-out both;
+}
+
+@media (max-width: 600px) {
+    .drawer { width: 100vw; }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VERIFICATION CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After full implementation, test and confirm each:
+
+  [ ] 1. Clicking "Observation" in existing sidebar loads 
+         the new page (existing route unchanged)
+  [ ] 2. KPI cards load with counts from API
+  [ ] 3. KPI cards animate in with stagger on load
+  [ ] 4. Filter bar renders and each filter calls API
+  [ ] 5. Table renders with correct columns
+  [ ] 6. Overdue rows highlighted red
+  [ ] 7. Quick status update works inline in table
+  [ ] 8. "Add Observation" opens the drawer from right
+  [ ] 9. Form validates required fields before submit
+  [ ] 10. Observation ID auto-generated (OBS-YYYY-NNNN)
+  [ ] 11. Day auto-calculated from selected date
+  [ ] 12. Photo upload preview works (before/after)
+  [ ] 13. Form submits to POST /api/observations
+  [ ] 14. New record appears in table after submit
+  [ ] 15. Row click opens detail drawer
+  [ ] 16. Detail shows photos if uploaded
+  [ ] 17. Analytics tab shows charts
+  [ ] 18. Charts use green theme colors
+  [ ] 19. Export CSV button downloads a file
+  [ ] 20. Table pagination works
+  [ ] 21. Sidebar active state shows "Observation" active
+  [ ] 22. Sidebar uses dark green theme
+  [ ] 23. No console errors on any action
+  [ ] 24. Mobile at 375px — no overflow or broken layout
+  [ ] 25. Tablet at 768px — usable layout
+  [ ] 26. Existing pages/routes still work
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Provide when complete:
+
+  1. Inspection findings (stack confirmed, existing files found)
+  2. Database changes (migration applied, columns added)
+  3. Backend files created/modified
+  4. API routes registered
+  5. Frontend files created/modified (full list)
+  6. CSS changes made to global styles
+  7. Pass/fail for all 26 checks
+  8. Anything requiring manual review or adjustment
+  9. Any conflicts found with existing code + how resolved

@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+client/node_modules/
+backend/vendor/
+
+# Build output
+client/dist/
+
+# Environment
+.env
+.env.local
+.env.production
+backend/.env
+
+# Laravel
+backend/storage/*.key
+backend/storage/logs/
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/
+
+# Legacy Node server (can be removed after migration verified)
+server/node_modules/
+server/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+backend/storage/app/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temp
+docx_tmp/

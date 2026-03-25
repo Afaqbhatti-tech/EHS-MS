@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /tmp/docx_extract)",
+      "Bash(unzip -o \"Project_Scope/EHS_OS_Project_Scope.docx\" word/document.xml -d /tmp/docx_extract)",
+      "Bash(npm -v)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir -p server)",
+      "Bash(npm init:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

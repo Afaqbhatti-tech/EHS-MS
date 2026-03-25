@@ -1,0 +1,19 @@
+{
+  "name": "ehs-os",
+  "version": "2.0.0",
+  "description": "EHS·OS — Environmental, Health & Safety Operating System (Laravel + React + MySQL)",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:backend": "cd backend && php artisan serve --port=8000",
+    "build:client": "cd client && npm run build",
+    "migrate": "cd backend && php artisan migrate",
+    "migrate:fresh": "cd backend && php artisan migrate:fresh --seed",
+    "seed": "cd backend && php artisan db:seed",
+    "tinker": "cd backend && php artisan tinker"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,230 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════
+   EHS·OS Design System — Tokens & Global Styles
+   ═══════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── Foundation ────────────────────────────── */
+  --color-canvas: #F8F9FB;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F1F3F7;
+  --color-border: #E2E6ED;
+  --color-border-strong: #C8CDD8;
+
+  /* ── Text ──────────────────────────────────── */
+  --color-text-primary: #0F1623;
+  --color-text-secondary: #4B5563;
+  --color-text-tertiary: #9CA3AF;
+  --color-text-disabled: #D1D5DB;
+  --color-text-inverse: #FFFFFF;
+
+  /* ── Primary Accent (Brand Blue) ───────────── */
+  --color-primary-50: #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-500: #3B82F6;
+  --color-primary-600: #2563EB;
+  --color-primary-700: #1D4ED8;
+  --color-primary-800: #1E40AF;
+  --color-primary-900: #1E3A8A;
+
+  /* ── Backward compat aliases ───────────────── */
+  --color-primary: #2563EB;
+  --color-primary-light: #3B82F6;
+  --color-primary-dark: #1E3A8A;
+
+  /* ── Success ───────────────────────────────── */
+  --color-success-50: #F0FDF4;
+  --color-success-100: #DCFCE7;
+  --color-success-500: #22C55E;
+  --color-success-600: #16A34A;
+  --color-success-700: #15803D;
+  --color-success: #16A34A;
+
+  /* ── Warning ───────────────────────────────── */
+  --color-warning-50: #FFFBEB;
+  --color-warning-100: #FEF3C7;
+  --color-warning-500: #F59E0B;
+  --color-warning-600: #D97706;
+  --color-warning: #D97706;
+
+  /* ── Danger ────────────────────────────────── */
+  --color-danger-50: #FEF2F2;
+  --color-danger-100: #FEE2E2;
+  --color-danger-500: #EF4444;
+  --color-danger-600: #DC2626;
+  --color-danger-700: #B91C1C;
+  --color-danger: #DC2626;
+
+  /* ── Info ───────────────────────────────────── */
+  --color-info-50: #F0F9FF;
+  --color-info-100: #E0F2FE;
+  --color-info-500: #0EA5E9;
+  --color-info-600: #0284C7;
+  --color-info: #0284C7;
+
+  /* ── Sidebar ───────────────────────────────── */
+  --color-sidebar: #0F1623;
+  --color-sidebar-hover: rgba(255,255,255,0.06);
+  --color-sidebar-active: rgba(59,130,246,0.15);
+  --color-sidebar-active-text: #DBEAFE;
+  --color-sidebar-active-border: #3B82F6;
+  --color-sidebar-group: #64748B;
+  --color-sidebar-text: #CBD5E1;
+  --color-secondary: #059669;
+
+  /* ── Radius ────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ── Shadows ───────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.04);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.07), 0 8px 10px rgba(0,0,0,0.04);
+
+  /* ── Transitions ───────────────────────────── */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 250ms ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Global Base Styles
+   ═══════════════════════════════════════════════════════ */
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.57;
+  color: var(--color-text-primary);
+  background-color: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Scrollbar Styling
+   ═══════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Skeleton Shimmer Animation
+   ═══════════════════════════════════════════════════════ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #F1F3F7 25%, #E8EBF0 50%, #F1F3F7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: var(--radius-sm);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Focus Ring Utility
+   ═══════════════════════════════════════════════════════ */
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-200);
+  border-color: var(--color-primary-500);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Selection Color
+   ═══════════════════════════════════════════════════════ */
+
+::selection {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-900);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Responsive Utilities
+   ═══════════════════════════════════════════════════════ */
+
+/* Safe area support for mobile devices with notch/rounded corners */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent CLS: reserve space for async content */
+.min-h-card { min-height: 120px; }
+.min-h-chart { min-height: 280px; }
+.min-h-table { min-height: 200px; }
+
+/* Responsive table wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent layout shift from scrollbar appearance */
+html {
+  overflow-y: scroll;
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Exclude small inline elements */
+  .inline-flex button, td button, .gap-1 button, .gap-2 button {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  transition: opacity 250ms ease;
+}
+
+/* Sidebar drawer transition */
+.sidebar-drawer {
+  transition: transform 250ms ease;
+}
+.sidebar-drawer.closed {
+  transform: translateX(-100%);
+}

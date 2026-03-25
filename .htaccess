@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Serve API requests to the Laravel backend (port 8000)
+RewriteRule ^api/(.*)$ http://localhost:8000/api/$1 [P,L]
+
+# Serve static files from client/dist
+RewriteCond %{REQUEST_URI} !^/client/dist/
+RewriteRule ^(.*)$ client/dist/$1 [L]
+
+# If the file doesn't exist in client/dist, serve index.html (SPA fallback)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ client/dist/index.html [L]
