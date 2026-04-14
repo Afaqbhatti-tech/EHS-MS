@@ -67,10 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${stored}`, 'ngrok-skip-browser-warning': '1' },
+      headers: { Authorization: `Bearer ${stored}`, 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
       .then(res => {
         if (!res.ok) throw new Error('Invalid token');
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) throw new Error('Server unavailable');
         return res.json();
       })
       .then(data => {
@@ -91,9 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (identifier: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
       body: JSON.stringify({ identifier, password }),
     });
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        res.status === 503
+          ? 'Backend server is unavailable. Please ensure the server is running.'
+          : `Server returned an unexpected response (${res.status}). Please try again later.`
+      );
+    }
 
     const data = await res.json();
     if (!res.ok) {

@@ -11,38 +11,51 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  success: 'bg-success-50 text-success-700',
-  warning: 'bg-warning-50 text-warning-600',
-  danger: 'bg-danger-50 text-danger-700',
-  info: 'bg-info-50 text-info-600',
-  neutral: 'bg-[#F3F4F6] text-[#6B7280]',
-  primary: 'bg-primary-50 text-primary-700',
+  success: 'bg-green-100 text-green-800',
+  warning: 'bg-amber-100 text-amber-800',
+  danger: 'bg-red-100 text-red-800',
+  info: 'bg-blue-100 text-blue-800',
+  neutral: 'bg-gray-100 text-gray-800',
+  primary: 'bg-indigo-100 text-indigo-800',
 };
 
 const dotStyles: Record<BadgeVariant, string> = {
-  success: 'bg-success-500',
-  warning: 'bg-warning-500',
-  danger: 'bg-danger-500',
-  info: 'bg-info-500',
-  neutral: 'bg-[#9CA3AF]',
-  primary: 'bg-primary-500',
+  success: 'bg-green-500',
+  warning: 'bg-amber-500',
+  danger: 'bg-red-500',
+  info: 'bg-blue-500',
+  neutral: 'bg-gray-500',
+  primary: 'bg-indigo-500',
 };
 
 // Map status strings to badge variants
 const STATUS_MAP: Record<string, BadgeVariant> = {
   // Success states
   Approved: 'success', Active: 'success', Valid: 'success', Compliant: 'success',
-  Verified: 'success', Closed: 'neutral', Completed: 'success',
+  Verified: 'success', Closed: 'neutral', Completed: 'success', Resolved: 'success',
+  Implemented: 'success', Conducted: 'success', Received: 'success',
+  'Partially Compliant': 'warning', 'Comments Resolved': 'success',
   // Warning states
   Pending: 'warning', Draft: 'warning', 'In Progress': 'warning',
-  'In Review': 'warning', 'Under Review': 'warning',
+  'In Review': 'warning', 'Under Review': 'warning', 'In Transit': 'warning',
+  Planned: 'warning', Prepared: 'warning', 'Ready for Dispatch': 'warning',
+  'Approved with Comments': 'warning', 'Action Assigned': 'warning',
+  Assigned: 'warning', Acknowledged: 'warning',
+  'Expiring Soon': 'warning', 'Due Soon': 'warning',
   // Danger states
   Expired: 'danger', Rejected: 'danger', Critical: 'danger',
   Overdue: 'danger', Suspended: 'danger', Cancelled: 'danger',
+  Reopened: 'danger', Escalated: 'danger', Blacklisted: 'danger',
+  'Non-Compliant': 'danger', 'Not Effective': 'danger',
   // Info states
-  Open: 'info', Submitted: 'info', New: 'info',
+  Open: 'info', Submitted: 'info', New: 'info', Dispatched: 'info',
+  'Submitted for Review': 'info', 'Re-submitted': 'info',
+  'Under Investigation': 'info', Reported: 'info',
+  // Primary states
+  Investigating: 'primary',
   // Neutral
   Inactive: 'neutral', 'N/A': 'neutral', Superseded: 'neutral',
+  Obsolete: 'neutral', Archived: 'neutral',
 };
 
 export function statusVariant(status: string): BadgeVariant {

@@ -19,6 +19,7 @@ class User extends Authenticatable
         'email',
         'username',
         'full_name',
+        'phone',
         'password_hash',
         'role',
         'contractor',

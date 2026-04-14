@@ -13,6 +13,9 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             WorkLineSeeder::class,
             NotificationSeeder::class,
+            ProfessionSeeder::class,
+            TrainingTopicSeeder::class,
+            ProfessionTrainingRequirementSeeder::class,
         ]);
     }
 }

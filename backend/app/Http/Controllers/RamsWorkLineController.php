@@ -79,24 +79,28 @@ class RamsWorkLineController extends Controller
             'color' => 'nullable|string|max:7',
         ]);
 
-        $slug = Str::slug($validated['name']);
-        if (WorkLine::where('slug', $slug)->exists()) {
-            return response()->json(['message' => 'A work line with this name already exists.'], 422);
+        try {
+            $slug = Str::slug($validated['name']);
+            if (WorkLine::where('slug', $slug)->exists()) {
+                return response()->json(['message' => 'A work line with this name already exists.'], 422);
+            }
+
+            $maxOrder = WorkLine::max('sort_order') ?? 0;
+
+            $line = WorkLine::create([
+                'id' => (string) Str::uuid(),
+                'name' => $validated['name'],
+                'slug' => $slug,
+                'description' => $validated['description'] ?? null,
+                'color' => $validated['color'] ?? '#3b82f6',
+                'sort_order' => $maxOrder + 1,
+                'is_active' => true,
+            ]);
+
+            return response()->json($line, 201);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to create work line: ' . $e->getMessage()], 500);
         }
-
-        $maxOrder = WorkLine::max('sort_order') ?? 0;
-
-        $line = WorkLine::create([
-            'id' => (string) Str::uuid(),
-            'name' => $validated['name'],
-            'slug' => $slug,
-            'description' => $validated['description'] ?? null,
-            'color' => $validated['color'] ?? '#3b82f6',
-            'sort_order' => $maxOrder + 1,
-            'is_active' => true,
-        ]);
-
-        return response()->json($line, 201);
     }
 
     /**
@@ -104,8 +108,6 @@ class RamsWorkLineController extends Controller
      */
     public function update(Request $request, string $slug): JsonResponse
     {
-        $line = WorkLine::where('slug', $slug)->firstOrFail();
-
         $validated = $request->validate([
             'name' => 'sometimes|string|max:150',
             'description' => 'nullable|string',
@@ -113,17 +115,91 @@ class RamsWorkLineController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
-        if (isset($validated['name']) && $validated['name'] !== $line->name) {
-            $newSlug = Str::slug($validated['name']);
-            if (WorkLine::where('slug', $newSlug)->where('id', '!=', $line->id)->exists()) {
-                return response()->json(['message' => 'A work line with this name already exists.'], 422);
+        try {
+            $line = WorkLine::where('slug', $slug)->firstOrFail();
+
+            if (isset($validated['name']) && $validated['name'] !== $line->name) {
+                $newSlug = Str::slug($validated['name']);
+                if (WorkLine::where('slug', $newSlug)->where('id', '!=', $line->id)->exists()) {
+                    return response()->json(['message' => 'A work line with this name already exists.'], 422);
+                }
+                $validated['slug'] = $newSlug;
             }
-            $validated['slug'] = $newSlug;
+
+            $line->update($validated);
+
+            return response()->json($line);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to update work line: ' . $e->getMessage()], 500);
         }
+    }
 
-        $line->update($validated);
+    /**
+     * DELETE /api/rams/work-lines/{slug}  (master only)
+     */
+    public function destroy(string $slug): JsonResponse
+    {
+        try {
+            $line = WorkLine::where('slug', $slug)->firstOrFail();
 
-        return response()->json($line);
+            if ($line->ramsDocuments()->count() > 0) {
+                return response()->json([
+                    'message' => 'Cannot delete a work line that has documents. Remove all documents first.',
+                ], 422);
+            }
+
+            $line->delete();
+
+            return response()->json(['message' => 'Work line deleted']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to delete work line: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/rams/work-lines/reorder  (master only)
+     * Accepts { ids: [uuid, uuid, ...] } — saves sort_order by array index.
+     */
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'required|string|size:36',
+        ]);
+
+        try {
+            // Validate that all IDs exist before reordering
+            $existingCount = WorkLine::whereIn('id', $validated['ids'])->count();
+            if ($existingCount !== count($validated['ids'])) {
+                return response()->json(['message' => 'One or more work line IDs are invalid.'], 422);
+            }
+
+            foreach ($validated['ids'] as $index => $id) {
+                WorkLine::where('id', $id)->update(['sort_order' => $index]);
+            }
+
+            return response()->json(['message' => 'Order updated']);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to reorder work lines: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * GET /api/rams/work-lines/phases
+     * Lightweight list of active work line names for dropdowns (mockups, etc.)
+     */
+    public function phases(): JsonResponse
+    {
+        $phases = WorkLine::where('is_active', true)
+            ->orderBy('sort_order')
+            ->select('id', 'name', 'slug')
+            ->get();
+
+        return response()->json($phases);
     }
 
     private function formatDocument($doc): array
@@ -153,10 +229,10 @@ class RamsWorkLineController extends Controller
                 'version_number' => $doc->latestVersion->version_number,
                 'file_name' => $doc->latestVersion->file_name,
                 'file_size' => $doc->latestVersion->file_size,
-                'uploaded_at' => $doc->latestVersion->created_at->toISOString(),
+                'uploaded_at' => $doc->latestVersion->created_at?->toISOString(),
             ] : null,
-            'created_at' => $doc->created_at->toISOString(),
-            'updated_at' => $doc->updated_at->toISOString(),
+            'created_at' => $doc->created_at?->toISOString(),
+            'updated_at' => $doc->updated_at?->toISOString(),
         ];
     }
 }

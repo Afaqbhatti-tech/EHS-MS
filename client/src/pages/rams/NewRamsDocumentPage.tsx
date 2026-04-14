@@ -2,10 +2,10 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
+import { useToast } from '../../components/ui/Toast';
 import { ArrowLeft, Upload } from 'lucide-react';
 import Button from '../../components/ui/Button';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface WorkLineOption {
   id: string;
@@ -14,7 +14,12 @@ interface WorkLineOption {
   color: string;
 }
 
-const CONTRACTORS = ['CCCC', 'CCC Rail', 'Artal', 'FFT Direct'];
+interface ContractorOption {
+  id: number;
+  contractor_code: string;
+  contractor_name: string;
+}
+
 const ZONES = [
   'Zone A', 'Zone B', 'Zone C',
   'Station 1', 'Station 2', 'Station 3', 'Station 4', 'Station 5',
@@ -28,18 +33,26 @@ const labelCls = 'block text-[13px] font-medium text-text-secondary mb-1.5';
 export default function NewRamsDocumentPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [workLineId, setWorkLineId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [contractor, setContractor] = useState('');
+  const [contractorCustom, setContractorCustom] = useState('');
   const [zone, setZone] = useState('');
+  const [zoneCustom, setZoneCustom] = useState('');
   const [dueDate, setDueDate] = useState('');
 
   const { data: workLines } = useQuery<WorkLineOption[]>({
     queryKey: ['rams-work-lines'],
     queryFn: () => api.get('/rams/work-lines'),
+  });
+
+  const { data: contractors = [] } = useQuery<ContractorOption[]>({
+    queryKey: ['contractors-active'],
+    queryFn: () => api.get<ContractorOption[]>('/contractors/list-active').then(d => Array.isArray(d) ? d : []),
   });
 
   const selectedLine = workLines?.find(wl => wl.id === workLineId);
@@ -50,25 +63,18 @@ export default function NewRamsDocumentPage() {
       fd.append('work_line_id', workLineId);
       fd.append('title', title);
       if (description) fd.append('description', description);
-      if (contractor) fd.append('contractor', contractor);
-      if (zone) fd.append('zone', zone);
+      const resolvedContractor = contractor === '__other__' ? contractorCustom.trim() : contractor;
+      const resolvedZone = zone === '__other__' ? zoneCustom.trim() : zone;
+      if (resolvedContractor) fd.append('contractor', resolvedContractor);
+      if (resolvedZone) fd.append('zone', resolvedZone);
       if (dueDate) fd.append('due_date', dueDate);
       const file = fileRef.current?.files?.[0];
       if (file) fd.append('file', file);
 
-      return fetch(`${API_BASE}/rams/documents`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('ehs_token')}`, 'ngrok-skip-browser-warning': '1' },
-        body: fd,
-      }).then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ message: res.statusText }));
-          throw new Error(err.message || 'Failed to create document');
-        }
-        return res.json();
-      });
+      return api.uploadForm('/rams/documents', fd);
     },
     onSuccess: () => {
+      toast.success('Document created successfully');
       queryClient.invalidateQueries({ queryKey: ['rams-work-lines'] });
       queryClient.invalidateQueries({ queryKey: ['rams-stats'] });
       if (selectedLine) {
@@ -77,6 +83,9 @@ export default function NewRamsDocumentPage() {
       } else {
         navigate('/rams-board');
       }
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to create document');
     },
   });
 
@@ -87,7 +96,7 @@ export default function NewRamsDocumentPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
+    <div className="max-w-lg mx-auto space-y-5 px-4 sm:px-6 lg:px-0">
       <div className="flex items-center gap-3 pb-5 border-b border-border">
         <button
           onClick={() => navigate('/rams-board')}
@@ -135,17 +144,25 @@ export default function NewRamsDocumentPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Contractor</label>
-            <select value={contractor} onChange={e => setContractor(e.target.value)} className={inputCls}>
+            <select value={contractor} onChange={e => { setContractor(e.target.value); if (e.target.value !== '__other__') setContractorCustom(''); }} className={inputCls}>
               <option value="">Select...</option>
-              {CONTRACTORS.map(c => <option key={c} value={c}>{c}</option>)}
+              {contractors.map(c => <option key={c.id} value={c.contractor_name}>{c.contractor_name}</option>)}
+              <option value="__other__">Other</option>
             </select>
+            {contractor === '__other__' && (
+              <input type="text" value={contractorCustom} onChange={e => setContractorCustom(e.target.value)} placeholder="Enter contractor name..." className={`${inputCls} mt-1.5`} autoFocus />
+            )}
           </div>
           <div>
             <label className={labelCls}>Zone</label>
-            <select value={zone} onChange={e => setZone(e.target.value)} className={inputCls}>
+            <select value={zone} onChange={e => { setZone(e.target.value); if (e.target.value !== '__other__') setZoneCustom(''); }} className={inputCls}>
               <option value="">Select...</option>
               {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+              <option value="__other__">Other</option>
             </select>
+            {zone === '__other__' && (
+              <input type="text" value={zoneCustom} onChange={e => setZoneCustom(e.target.value)} placeholder="Enter zone name..." className={`${inputCls} mt-1.5`} autoFocus />
+            )}
           </div>
         </div>
 

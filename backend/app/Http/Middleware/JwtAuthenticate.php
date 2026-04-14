@@ -12,12 +12,15 @@ class JwtAuthenticate
     public function handle(Request $request, Closure $next): Response
     {
         $header = $request->header('Authorization');
+        $token = null;
 
-        if (!$header || !str_starts_with($header, 'Bearer ')) {
-            return response()->json(['message' => 'Authentication required'], 401);
+        if ($header && str_starts_with($header, 'Bearer ')) {
+            $token = substr($header, 7);
         }
 
-        $token = substr($header, 7);
+        if (!$token) {
+            return response()->json(['message' => 'Authentication required'], 401);
+        }
 
         // Use Sanctum to find the token
         $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
@@ -44,6 +47,7 @@ class JwtAuthenticate
             : $user->permissions;
 
         $request->setUserResolver(fn () => $user);
+        \Illuminate\Support\Facades\Auth::setUser($user);
         $accessToken->forceFill(['last_used_at' => now()])->save();
 
         return $next($request);

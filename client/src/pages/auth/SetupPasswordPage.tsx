@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useSearchParams, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, Check, X, AlertCircle, Lock, Brain, BarChart3, Shield } from 'lucide-react';
+import { Eye, EyeOff, Check, X as XIcon, AlertCircle, Lock, Brain, BarChart3, Shield } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -15,7 +15,7 @@ const PASSWORD_RULES: PasswordRule[] = [
   { label: 'One uppercase letter', test: pw => /[A-Z]/.test(pw) },
   { label: 'One lowercase letter', test: pw => /[a-z]/.test(pw) },
   { label: 'One number', test: pw => /\d/.test(pw) },
-  { label: 'One special character', test: pw => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw) },
+  { label: 'One special character', test: pw => /[^A-Za-z0-9]/.test(pw) },
 ];
 
 export default function SetupPasswordPage() {
@@ -36,10 +36,6 @@ export default function SetupPasswordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   useEffect(() => {
     if (!token) {
       setVerifying(false);
@@ -48,20 +44,27 @@ export default function SetupPasswordPage() {
     }
 
     fetch(`${API_BASE}/auth/verify-setup-token/${token}`, {
-        headers: { 'ngrok-skip-browser-warning': '1' },
+        headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
       })
       .then(r => r.json())
       .then(data => {
         if (data.valid) {
           setTokenValid(true);
-          setUserName(data.name || '');
+          setUserName(data.fullName || data.name || '');
         } else {
-          setTokenError(data.reason || 'Invalid token');
+          setTokenError(data.reason || data.message || 'Invalid token');
         }
       })
       .catch(() => setTokenError('Failed to verify token'))
       .finally(() => setVerifying(false));
   }, [token]);
+
+  // Redirect to login after successful password setup
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => navigate('/login'), 2000);
+    return () => clearTimeout(timer);
+  }, [success, navigate]);
 
   const strength = PASSWORD_RULES.filter(r => r.test(password)).length;
   const segments = 4;
@@ -73,6 +76,10 @@ export default function SetupPasswordPage() {
     if (filledSegments <= 3) return 'bg-warning-500';
     return 'bg-success-500';
   };
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,7 +99,7 @@ export default function SetupPasswordPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/setup-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'ngrok-skip-browser-warning': '1' },
         body: JSON.stringify({ token, password, password_confirmation: confirm }),
       });
 
@@ -103,7 +110,6 @@ export default function SetupPasswordPage() {
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -160,7 +166,7 @@ export default function SetupPasswordPage() {
             ) : !tokenValid ? (
               <div className="text-center py-8">
                 <div className="w-14 h-14 bg-danger-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X size={24} className="text-danger-500" />
+                  <XIcon size={24} className="text-danger-500" />
                 </div>
                 <h2 className="text-[20px] font-semibold text-text-primary mb-2">Link Invalid</h2>
                 <p className="text-[13px] text-text-secondary mb-4">{tokenError}</p>
@@ -226,7 +232,7 @@ export default function SetupPasswordPage() {
                               {rule.test(password) ? (
                                 <Check size={12} className="text-success-600 shrink-0" />
                               ) : (
-                                <X size={12} className="text-text-disabled shrink-0" />
+                                <XIcon size={12} className="text-text-disabled shrink-0" />
                               )}
                               <span className={rule.test(password) ? 'text-success-700' : 'text-text-tertiary'}>
                                 {rule.label}

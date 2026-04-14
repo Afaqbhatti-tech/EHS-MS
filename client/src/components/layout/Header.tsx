@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import NotificationPanel from '../NotificationPanel';
+import { api } from '../../services/api';
 
 const ROLE_LABELS: Record<string, string> = {
   system_admin: 'System Admin', ehs_manager: 'EHS Manager',
@@ -18,6 +19,7 @@ const ROLE_LABELS: Record<string, string> = {
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/profile': 'My Profile',
+  '/help-support': 'Help & Support',
   '/ai-intelligence': 'AI Intelligence',
   '/observations': 'Observations',
   '/permits': 'Permits to Work',
@@ -28,7 +30,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/weekly-mom': 'Weekly MOM',
   '/training-matrix': 'Training Matrix',
   '/equipment': 'Equipment Register',
-  '/violations': 'Violations',
+  '/violations': 'Violation Register',
   '/incidents': 'Incidents',
   '/mock-drills': 'Mock Drills / ERP',
   '/permits/calendar': 'PTW Calendar',
@@ -40,8 +42,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/environmental/waste-manifests': 'Waste Manifests',
   '/environmental/contractor-records': 'Contractor Records',
   '/reports': 'KPIs & Reports',
-  '/admin/users': 'Users & Permissions',
-  '/admin/roles': 'Role Management',
+  '/admin/users': 'Access Management',
+  '/admin/roles': 'Access Management',
+  '/admin/audit-log': 'Access Management',
 };
 
 interface HeaderProps {
@@ -56,6 +59,19 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
 
   const pageTitle = PAGE_TITLES[location.pathname] || '';
+  const [incidentFreeDays, setIncidentFreeDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<{ stats: Array<{ key: string; value: number }> }>('/dashboard')
+      .then(d => {
+        if (cancelled) return;
+        const ifd = d.stats?.find(s => s.key === 'incident_free_days');
+        if (ifd) setIncidentFreeDays(ifd.value);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -73,7 +89,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 sm:h-16 bg-white border-b border-border flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 gap-2">
+      <header className="h-14 sm:h-16 bg-white border-b border-border flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 gap-2 relative z-10">
         {/* Left — Hamburger + Page title */}
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -104,9 +120,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
         {/* Right */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Incident-free days — hidden below xl */}
-          <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-success-50 text-success-700 border border-success-100">
-            <span className="w-1.5 h-1.5 rounded-full bg-success-500" />
-            87 Incident-Free Days
+          <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-600 text-white shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-pulse" />
+            {incidentFreeDays ?? '--'} Incident-Free Days
           </span>
 
           {/* Notifications */}
@@ -161,8 +177,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   {hasRole('master', 'system_admin', 'ehs_manager') && (
                     <MenuItem
                       icon={<Shield size={15} />}
-                      label="Manage Roles"
-                      sublabel="Permissions & access control"
+                      label="Access Management"
+                      sublabel="Roles, permissions & access control"
                       onClick={() => {
                         setMenuOpen(false);
                         navigate('/admin/roles');
@@ -176,6 +192,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                     sublabel="Documentation & guides"
                     onClick={() => {
                       setMenuOpen(false);
+                      navigate('/help-support');
                     }}
                   />
                 </div>

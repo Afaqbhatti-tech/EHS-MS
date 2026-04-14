@@ -3,6 +3,7 @@ import { authRouter } from './auth.js';
 import { usersRouter } from './users.js';
 import { rolesRouter } from './roles.js';
 import { reportsRouter } from './reports.js';
+import { observationsRouter } from './observations.js';
 
 export const router = Router();
 
@@ -13,6 +14,9 @@ router.use('/roles', rolesRouter);
 
 // Reports
 router.use('/reports', reportsRouter);
+
+// Observations
+router.use('/observations', observationsRouter);
 
 router.get('/', (_req, res) => {
   res.json({

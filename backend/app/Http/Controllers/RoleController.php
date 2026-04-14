@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Constants\Permissions;
+use App\Constants\PermissionRegistry;
+use App\Models\PermissionAuditLog;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
@@ -10,6 +12,7 @@ use App\Models\UserPermissionOverride;
 use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
@@ -23,8 +26,10 @@ class RoleController extends Controller
     public function index(): JsonResponse
     {
         $roles = Role::where('is_active', true)->get();
+        $allKeys = PermissionRegistry::allKeys();
+        $totalPerms = count($allKeys);
 
-        $result = $roles->map(function (Role $role) {
+        $result = $roles->map(function (Role $role) use ($totalPerms) {
             $rp = RolePermission::where('role', $role->slug)->first();
             $perms = $rp ? ($rp->permissions ?? []) : [];
             $grantedCount = count(array_filter($perms));
@@ -39,13 +44,13 @@ class RoleController extends Controller
                 'description' => $role->description,
                 'isSystem' => $role->is_system,
                 'isActive' => $role->is_active,
-                'grantedCount' => $role->slug === 'master' ? count(Permissions::ALL) : $grantedCount,
-                'totalPermissions' => count(Permissions::ALL),
+                'grantedCount' => $role->slug === 'master' ? $totalPerms : $grantedCount,
+                'totalPermissions' => $totalPerms,
                 'userCount' => $userCount,
             ];
         });
 
-        return response()->json($result);
+        return response()->json(['roles' => $result]);
     }
 
     /**
@@ -59,7 +64,7 @@ class RoleController extends Controller
             ->get()
             ->map(fn ($r) => ['value' => $r->slug, 'label' => $r->name]);
 
-        return response()->json($roles);
+        return response()->json(['roles' => $roles]);
     }
 
     /**
@@ -87,10 +92,16 @@ class RoleController extends Controller
             'is_active' => true,
         ]);
 
-        // Create empty permission set
+        // Create empty permission set (minimal defaults)
         RolePermission::create([
             'role' => $slug,
             'permissions' => [],
+        ]);
+
+        // Audit log
+        $this->logAudit($request, null, 'role_created', $slug, [
+            'name' => $role->name,
+            'slug' => $slug,
         ]);
 
         return response()->json([
@@ -132,9 +143,11 @@ class RoleController extends Controller
 
             $data['slug'] = $newSlug;
 
-            // Cascade slug update
-            User::where('role', $roleSlug)->update(['role' => $newSlug]);
-            RolePermission::where('role', $roleSlug)->update(['role' => $newSlug]);
+            // Cascade slug update within transaction for data consistency
+            DB::transaction(function () use ($roleSlug, $newSlug) {
+                User::where('role', $roleSlug)->update(['role' => $newSlug]);
+                RolePermission::where('role', $roleSlug)->update(['role' => $newSlug]);
+            });
         }
 
         $role->update($data);
@@ -173,6 +186,14 @@ class RoleController extends Controller
                 ], 400);
             }
 
+            // Validate that the target role exists and is active
+            $targetRole = Role::where('slug', $reassignTo)->where('is_active', true)->first();
+            if (!$targetRole) {
+                return response()->json([
+                    'message' => 'Target role for reassignment does not exist or is inactive.',
+                ], 400);
+            }
+
             // Reassign users
             User::where('role', $roleSlug)->update(['role' => $reassignTo]);
 
@@ -184,6 +205,13 @@ class RoleController extends Controller
         RolePermission::where('role', $roleSlug)->delete();
         $role->delete();
 
+        // Audit log
+        $this->logAudit($request, null, 'role_deleted', $roleSlug, [
+            'name' => $role->name,
+            'reassignedTo' => $reassignTo,
+            'usersReassigned' => $userCount,
+        ]);
+
         return response()->json(['message' => 'Role deleted successfully']);
     }
 
@@ -192,7 +220,19 @@ class RoleController extends Controller
      */
     public function allPermissions(): JsonResponse
     {
-        return response()->json(Permissions::ALL);
+        return response()->json(Permissions::all());
+    }
+
+    /**
+     * GET /api/roles/permissions/registry
+     * Returns the full permission registry tree for the Access Management UI.
+     */
+    public function permissionRegistry(): JsonResponse
+    {
+        return response()->json([
+            'registry' => PermissionRegistry::tree(),
+            'allKeys' => PermissionRegistry::allKeys(),
+        ]);
     }
 
     /**
@@ -201,7 +241,7 @@ class RoleController extends Controller
     public function getPermissions(string $roleSlug): JsonResponse
     {
         $perms = $this->permissionService->getRolePermissions($roleSlug);
-        return response()->json($perms);
+        return response()->json(['permissions' => $perms]);
     }
 
     /**
@@ -220,6 +260,9 @@ class RoleController extends Controller
 
         $permissions = $request->input('permissions', []);
 
+        // Get old permissions for audit diff
+        $oldPerms = $this->permissionService->getRolePermissions($roleSlug);
+
         RolePermission::updateOrCreate(
             ['role' => $roleSlug],
             ['permissions' => $permissions],
@@ -227,6 +270,12 @@ class RoleController extends Controller
 
         // Recalculate all users with this role
         $this->permissionService->syncRole($roleSlug);
+
+        // Build change diff for audit
+        $changes = $this->buildPermissionDiff($oldPerms, $permissions);
+
+        // Audit log
+        $this->logAudit($request, null, 'role_permissions_updated', $roleSlug, $changes);
 
         return response()->json(['message' => 'Permissions updated', 'permissions' => $permissions]);
     }
@@ -244,14 +293,14 @@ class RoleController extends Controller
                 return [
                     'id' => $u->id,
                     'email' => $u->email,
-                    'fullName' => $u->full_name,
+                    'name' => $u->full_name,
                     'isActive' => $u->is_active,
                     'lastLoginAt' => $u->last_login_at?->toISOString(),
                     'hasOverrides' => $hasOverrides,
                 ];
             });
 
-        return response()->json($users);
+        return response()->json(['users' => $users]);
     }
 
     /**
@@ -304,6 +353,10 @@ class RoleController extends Controller
             }
         }
 
+        // Get old overrides for audit
+        $oldOverride = UserPermissionOverride::where('user_id', $userId)->first();
+        $oldOverrides = $oldOverride ? ($oldOverride->overrides ?? []) : [];
+
         if (empty($cleaned)) {
             UserPermissionOverride::where('user_id', $userId)->delete();
         } else {
@@ -318,9 +371,78 @@ class RoleController extends Controller
 
         $effective = $this->permissionService->calculateEffective($userId);
 
+        // Audit log
+        $changes = $this->buildPermissionDiff($oldOverrides, $cleaned);
+        $this->logAudit($request, $userId, 'user_overrides_updated', $user->role, $changes);
+
         return response()->json([
             'overrides' => $cleaned,
             'effective' => $effective,
         ]);
+    }
+
+    /**
+     * GET /api/roles/audit-logs
+     */
+    public function auditLogs(Request $request): JsonResponse
+    {
+        $query = PermissionAuditLog::orderByDesc('created_at');
+
+        if ($request->has('role')) {
+            $query->where('target_role', $request->input('role'));
+        }
+
+        $logs = $query->limit(100)->get()->map(fn ($log) => [
+            'id' => $log->id,
+            'actorName' => $log->actor_name,
+            'targetRole' => $log->target_role,
+            'targetUserId' => $log->target_user_id,
+            'action' => $log->action,
+            'changes' => $log->changes,
+            'notes' => $log->notes,
+            'createdAt' => $log->created_at?->toISOString(),
+        ]);
+
+        return response()->json(['logs' => $logs]);
+    }
+
+    // ─── Private Helpers ──────────────────────────────
+
+    private function logAudit(Request $request, ?string $targetUserId, string $action, ?string $targetRole, array $changes): void
+    {
+        $actor = $request->user();
+        PermissionAuditLog::create([
+            'actor_id' => $actor?->id,
+            'actor_name' => $actor?->full_name ?? 'System',
+            'target_role' => $targetRole,
+            'target_user_id' => $targetUserId,
+            'action' => $action,
+            'changes' => $changes,
+            'created_at' => now(),
+        ]);
+    }
+
+    private function buildPermissionDiff(array $old, array $new): array
+    {
+        $enabled = [];
+        $disabled = [];
+
+        $allKeys = array_unique(array_merge(array_keys($old), array_keys($new)));
+        foreach ($allKeys as $key) {
+            $wasGranted = !empty($old[$key]);
+            $isGranted = !empty($new[$key]);
+            if (!$wasGranted && $isGranted) {
+                $enabled[] = $key;
+            } elseif ($wasGranted && !$isGranted) {
+                $disabled[] = $key;
+            }
+        }
+
+        return [
+            'enabled' => $enabled,
+            'disabled' => $disabled,
+            'enabledCount' => count($enabled),
+            'disabledCount' => count($disabled),
+        ];
     }
 }

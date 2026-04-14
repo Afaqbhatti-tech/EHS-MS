@@ -13,10 +13,10 @@ export default function ProtectedRoute({ children, roles, permission }: Protecte
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center py-32">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 text-sm">Loading EHS·OS...</p>
+          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-text-tertiary text-[13px]">Loading...</p>
         </div>
       </div>
     );
@@ -26,32 +26,17 @@ export default function ProtectedRoute({ children, roles, permission }: Protecte
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Role-based check
+  // Role-based or permission-based denial → redirect to dashboard
   if (roles && user && !roles.includes(user.role)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">403</div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-500 mb-6">You don't have permission to access this page.</p>
-          <a href="/dashboard" className="text-primary hover:underline">Back to Dashboard</a>
-        </div>
-      </div>
-    );
+    return <Navigate to="/dashboard" replace />;
   }
 
-  // Permission-based check
-  if (permission && !hasPermission(permission)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">403</div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-500 mb-6">You don't have permission to access this page.</p>
-          <a href="/dashboard" className="text-primary hover:underline">Back to Dashboard</a>
-        </div>
-      </div>
-    );
+  if (permission) {
+    // Support pipe-separated OR logic: "can_manage_roles|can_manage_users"
+    const allowed = permission.includes('|')
+      ? permission.split('|').some(p => hasPermission(p))
+      : hasPermission(permission);
+    if (!allowed) return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

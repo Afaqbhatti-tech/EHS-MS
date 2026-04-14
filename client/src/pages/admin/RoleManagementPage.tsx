@@ -3,15 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Shield, Users, ChevronRight, Plus, Pencil, Trash2,
-  AlertTriangle, Check, Lock,
+  AlertTriangle, Lock,
 } from 'lucide-react';
-import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { PageSpinner } from '../../components/ui/Spinner';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { useToast } from '../../components/ui/Toast';
+import { api } from '../../services/api';
 
 interface RoleInfo {
   id: string;
@@ -35,66 +34,42 @@ function slugify(name: string): string {
     .replace(/^_+|_+$/g, '');
 }
 
-export default function RoleManagementPage() {
-  const { token, hasRole } = useAuth();
+export function RolesContent() {
+  const { hasRole } = useAuth();
   const navigate = useNavigate();
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
 
   const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const toast = useToast();
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [editRole, setEditRole] = useState<RoleInfo | null>(null);
   const [deleteRole, setDeleteRole] = useState<RoleInfo | null>(null);
 
-  // Toast state
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
   const isMaster = hasRole('master');
 
   const fetchRoles = () => {
     setLoading(true);
-    fetch(`${API_BASE}/roles`, { headers })
-      .then(r => r.json())
+    api.get<{ roles: RoleInfo[] }>('/roles')
       .then(d => setRoles(d.roles || []))
-      .catch(console.error)
+      .catch(() => toast.error('Failed to load roles'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(fetchRoles, [token]);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  useEffect(fetchRoles, []);
 
   return (
     <div className="max-w-[1024px]">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-[60] px-4 py-3 rounded-[var(--radius-md)] shadow-lg text-[13px] font-medium flex items-center gap-2 ${
-          toast.type === 'success'
-            ? 'bg-success-50 text-success-700 border border-success-100'
-            : 'bg-danger-50 text-danger-700 border border-danger-100'
-        }`}>
-          {toast.type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
-          {toast.message}
+      {/* Action bar */}
+      {isMaster && (
+        <div className="flex justify-end mb-4">
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)}>
+            Add Role
+          </Button>
         </div>
       )}
-
-      <PageHeader
-        title="Role Management"
-        subtitle="Configure roles and permissions. Click a role to manage its permissions."
-        icon={<Shield />}
-        actions={
-          isMaster ? (
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)}>
-              Add Role
-            </Button>
-          ) : undefined
-        }
-      />
 
       {/* Role List */}
       {loading ? (
@@ -114,7 +89,7 @@ export default function RoleManagementPage() {
                 <button
                   onClick={() => navigate(`/admin/roles/${r.slug}`)}
                   className={`w-11 h-11 rounded-[var(--radius-md)] flex items-center justify-center shrink-0 ${
-                    isMasterRole ? 'bg-warning-50 text-warning-600' : r.isSystem ? 'bg-primary-50 text-primary-600' : 'bg-[#F5F3FF] text-[#8B5CF6]'
+                    isMasterRole ? 'bg-purple-100 text-purple-800' : r.isSystem ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
                   }`}
                 >
                   <Shield size={20} />
@@ -168,18 +143,18 @@ export default function RoleManagementPage() {
                     <>
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditRole(r); }}
-                        className="p-2 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-tertiary hover:text-primary-600 transition-colors duration-150"
+                        className="action-btn action-btn--edit"
                         title="Edit role"
                       >
-                        <Pencil size={16} />
+                        <Pencil size={15} />
                       </button>
                       {!r.isSystem && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteRole(r); }}
-                          className="p-2 rounded-[var(--radius-sm)] hover:bg-danger-50 text-text-tertiary hover:text-danger-600 transition-colors duration-150"
+                          className="action-btn action-btn--delete"
                           title="Delete role"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       )}
                     </>
@@ -200,14 +175,13 @@ export default function RoleManagementPage() {
       {/* Add Role Modal */}
       {showAddModal && (
         <AddRoleModal
-          headers={headers}
           onClose={() => setShowAddModal(false)}
           onCreated={(msg) => {
             setShowAddModal(false);
-            showToast(msg, 'success');
+            toast.success(msg);
             fetchRoles();
           }}
-          onError={(msg) => showToast(msg, 'error')}
+          onError={(msg) => toast.error(msg)}
         />
       )}
 
@@ -215,14 +189,13 @@ export default function RoleManagementPage() {
       {editRole && (
         <EditRoleModal
           role={editRole}
-          headers={headers}
           onClose={() => setEditRole(null)}
           onSaved={(msg) => {
             setEditRole(null);
-            showToast(msg, 'success');
+            toast.success(msg);
             fetchRoles();
           }}
-          onError={(msg) => showToast(msg, 'error')}
+          onError={(msg) => toast.error(msg)}
         />
       )}
 
@@ -231,18 +204,21 @@ export default function RoleManagementPage() {
         <DeleteRoleModal
           role={deleteRole}
           allRoles={roles}
-          headers={headers}
           onClose={() => setDeleteRole(null)}
           onDeleted={(msg) => {
             setDeleteRole(null);
-            showToast(msg, 'success');
+            toast.success(msg);
             fetchRoles();
           }}
-          onError={(msg) => showToast(msg, 'error')}
+          onError={(msg) => toast.error(msg)}
         />
       )}
     </div>
   );
+}
+
+export default function RoleManagementPage() {
+  return <RolesContent />;
 }
 
 // ─────────────────────────────────────────────
@@ -250,13 +226,12 @@ export default function RoleManagementPage() {
 // ─────────────────────────────────────────────
 
 interface AddRoleModalProps {
-  headers: Record<string, string>;
   onClose: () => void;
   onCreated: (message: string) => void;
   onError: (message: string) => void;
 }
 
-function AddRoleModal({ headers, onClose, onCreated, onError }: AddRoleModalProps) {
+function AddRoleModal({ onClose, onCreated, onError }: AddRoleModalProps) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
@@ -277,21 +252,12 @@ function AddRoleModal({ headers, onClose, onCreated, onError }: AddRoleModalProp
     setSubmitting(true);
 
     try {
-      const res = await fetch(`${API_BASE}/roles`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ name, slug, description: description || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Failed to create role');
-        onError(data.message || 'Failed to create role');
-        return;
-      }
+      await api.post('/roles', { name, slug, description: description || undefined });
       onCreated(`Role "${name}" created successfully`);
-    } catch {
-      setError('Network error');
-      onError('Network error');
+    } catch (err: any) {
+      const msg = err.message || 'Failed to create role';
+      setError(msg);
+      onError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -372,13 +338,12 @@ function AddRoleModal({ headers, onClose, onCreated, onError }: AddRoleModalProp
 
 interface EditRoleModalProps {
   role: RoleInfo;
-  headers: Record<string, string>;
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
-function EditRoleModal({ role, headers, onClose, onSaved, onError }: EditRoleModalProps) {
+function EditRoleModal({ role, onClose, onSaved, onError }: EditRoleModalProps) {
   const [name, setName] = useState(role.name);
   const [slug, setSlug] = useState(role.slug);
   const [description, setDescription] = useState(role.description);
@@ -401,21 +366,12 @@ function EditRoleModal({ role, headers, onClose, onSaved, onError }: EditRoleMod
         return;
       }
 
-      const res = await fetch(`${API_BASE}/roles/${role.slug}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Failed to update role');
-        onError(data.message || 'Failed to update role');
-        return;
-      }
+      await api.put(`/roles/${role.slug}`, body);
       onSaved(`Role "${name}" updated successfully`);
-    } catch {
-      setError('Network error');
-      onError('Network error');
+    } catch (err: any) {
+      const msg = err.message || 'Failed to update role';
+      setError(msg);
+      onError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -498,13 +454,12 @@ function EditRoleModal({ role, headers, onClose, onSaved, onError }: EditRoleMod
 interface DeleteRoleModalProps {
   role: RoleInfo;
   allRoles: RoleInfo[];
-  headers: Record<string, string>;
   onClose: () => void;
   onDeleted: (message: string) => void;
   onError: (message: string) => void;
 }
 
-function DeleteRoleModal({ role, allRoles, headers, onClose, onDeleted, onError }: DeleteRoleModalProps) {
+function DeleteRoleModal({ role, allRoles, onClose, onDeleted, onError }: DeleteRoleModalProps) {
   const [reassignTo, setReassignTo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -527,21 +482,12 @@ function DeleteRoleModal({ role, allRoles, headers, onClose, onDeleted, onError 
     setSubmitting(true);
 
     try {
-      const res = await fetch(`${API_BASE}/roles/${role.slug}`, {
-        method: 'DELETE',
-        headers,
-        body: JSON.stringify({ reassignTo: hasUsers ? reassignTo : undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Failed to delete role');
-        onError(data.message || 'Failed to delete role');
-        return;
-      }
+      const data = await api.delete<{ message?: string }>(`/roles/${role.slug}`, hasUsers ? { reassign_to: reassignTo } : undefined);
       onDeleted(data.message || `Role "${role.name}" deleted successfully`);
-    } catch {
-      setError('Network error');
-      onError('Network error');
+    } catch (err: any) {
+      const msg = err.message || 'Failed to delete role';
+      setError(msg);
+      onError(msg);
     } finally {
       setSubmitting(false);
     }

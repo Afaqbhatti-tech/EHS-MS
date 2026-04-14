@@ -1,13 +1,11 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { UserPlus, Copy, RefreshCw, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import PageHeader from '../../components/ui/PageHeader';
+import { Copy, RefreshCw, Check, ChevronDown, ChevronUp, KeyRound, Pencil, Trash2, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { PageSpinner } from '../../components/ui/Spinner';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { useToast } from '../../components/ui/Toast';
+import { api } from '../../services/api';
 
 interface UserRecord {
   id: string;
@@ -27,7 +25,12 @@ interface RoleOption {
   label: string;
 }
 
-const CONTRACTORS = ['CCCC', 'CCC Rail', 'Artal', 'FFT Direct'];
+interface ContractorOption {
+  id: number;
+  contractor_code: string;
+  contractor_name: string;
+}
+
 
 const PERMISSION_GROUPS = [
   {
@@ -67,35 +70,39 @@ function formatPermLabel(perm: string) {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export default function UsersPage() {
-  const { token } = useAuth();
+export function UsersContent() {
+  const toast = useToast();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [contractors, setContractors] = useState<ContractorOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [setupLink, setSetupLink] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
-
   const fetchUsers = () => {
     setLoading(true);
-    fetch(`${API_BASE}/users`, { headers })
-      .then(r => r.json())
+    api.get<{ users: UserRecord[] }>('/users')
       .then(d => setUsers(d.users || []))
-      .catch(console.error)
+      .catch(() => toast.error('Failed to load users'))
       .finally(() => setLoading(false));
   };
 
   const fetchRoles = () => {
-    fetch(`${API_BASE}/roles/dropdown`, { headers })
-      .then(r => r.json())
-      .then(d => setRoles((d.roles || []).map((r: any) => ({ value: r.value, label: r.label }))))
-      .catch(console.error);
+    api.get<{ roles: Array<{ value: string; label: string }> }>('/roles/dropdown')
+      .then(d => setRoles((d.roles || []).map(r => ({ value: r.value, label: r.label }))))
+      .catch(() => toast.error('Failed to load roles'));
   };
 
-  useEffect(() => { fetchUsers(); fetchRoles(); }, [token]);
+  const fetchContractors = () => {
+    api.get<ContractorOption[]>('/contractors/list-active')
+      .then(d => setContractors(Array.isArray(d) ? d : []))
+      .catch(() => { /* contractors dropdown is optional */ });
+  };
+
+  useEffect(() => { fetchUsers(); fetchRoles(); fetchContractors(); }, []);
 
   const copyLink = (link: string) => {
     navigator.clipboard.writeText(link);
@@ -104,41 +111,37 @@ export default function UsersPage() {
   };
 
   const handleResendSetup = async (userId: string) => {
-    const res = await fetch(`${API_BASE}/users/${userId}/resend-setup`, {
-      method: 'POST',
-      headers,
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setSetupLink(data.setupUrl);
+    try {
+      const data = await api.post<{ setupUrl: string }>(`/users/${userId}/resend-setup`, {});
+      if (data.setupUrl) setSetupLink(data.setupUrl);
+      toast.success('Setup link sent successfully');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to resend setup link');
     }
   };
 
   const toggleActive = async (user: UserRecord) => {
-    await fetch(`${API_BASE}/users/${user.id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({ isActive: !user.isActive }),
-    });
-    fetchUsers();
+    try {
+      await api.put(`/users/${user.id}`, { isActive: !user.isActive });
+      toast.success(`User ${user.isActive ? 'deactivated' : 'activated'} successfully`);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update user status');
+    }
   };
 
   return (
     <div className="max-w-[1440px]">
-      <PageHeader
-        title="Users & Permissions"
-        subtitle="Manage user accounts, roles, and access control"
-        icon={<UserPlus />}
-        actions={
-          <Button
-            variant="primary"
-            icon={<UserPlus size={16} />}
-            onClick={() => { setShowCreate(true); setEditingUser(null); setSetupLink(''); }}
-          >
-            Create User
-          </Button>
-        }
-      />
+      {/* Action bar */}
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="primary"
+          icon={<KeyRound size={16} />}
+          onClick={() => setShowResetPassword(true)}
+        >
+          Reset Password
+        </Button>
+      </div>
 
       {/* Setup link banner */}
       {setupLink && (
@@ -198,26 +201,29 @@ export default function UsersPage() {
                     {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1 table-actions">
                       <button
                         onClick={() => { setEditingUser(u); setShowCreate(false); }}
-                        className="text-primary-600 hover:text-primary-700 text-[11px] font-medium transition-colors duration-150"
+                        className="action-btn action-btn--edit"
+                        title="Edit"
                       >
-                        Edit
+                        <Pencil size={15} />
                       </button>
                       {!u.passwordSet && (
                         <button
                           onClick={() => handleResendSetup(u.id)}
-                          className="inline-flex items-center gap-1 text-warning-600 hover:text-warning-700 text-[11px] font-medium transition-colors duration-150"
+                          className="action-btn action-btn--view"
+                          title="Resend Setup Link"
                         >
-                          <RefreshCw size={12} /> Setup Link
+                          <RefreshCw size={15} />
                         </button>
                       )}
                       <button
                         onClick={() => toggleActive(u)}
-                        className={`text-[11px] font-medium transition-colors duration-150 ${u.isActive ? 'text-danger-600 hover:text-danger-700' : 'text-success-600 hover:text-success-700'}`}
+                        className="action-btn action-btn--delete"
+                        title={u.isActive ? 'Deactivate' : 'Activate'}
                       >
-                        {u.isActive ? 'Deactivate' : 'Activate'}
+                        {u.isActive ? <Trash2 size={15} /> : <RefreshCw size={15} />}
                       </button>
                     </div>
                   </td>
@@ -254,17 +260,17 @@ export default function UsersPage() {
                       <span className="text-[11px] text-text-tertiary">{u.contractor}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 pt-1">
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
                     <button
                       onClick={() => { setEditingUser(u); setShowCreate(false); }}
-                      className="text-primary-600 hover:text-primary-700 text-[12px] font-medium"
+                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 text-[12px] font-medium"
                     >
-                      Edit
+                      <Pencil size={12} /> Edit
                     </button>
                     {!u.passwordSet && (
                       <button
                         onClick={() => handleResendSetup(u.id)}
-                        className="inline-flex items-center gap-1 text-warning-600 hover:text-warning-700 text-[12px] font-medium"
+                        className="inline-flex items-center gap-1 text-info-600 hover:text-info-700 text-[12px] font-medium"
                       >
                         <RefreshCw size={12} /> Setup Link
                       </button>
@@ -287,8 +293,8 @@ export default function UsersPage() {
       {(showCreate || editingUser) && (
         <UserModal
           user={editingUser}
-          headers={headers}
           roles={roles}
+          contractors={contractors}
           onClose={() => { setShowCreate(false); setEditingUser(null); }}
           onSaved={(link) => {
             if (link) setSetupLink(link);
@@ -298,21 +304,37 @@ export default function UsersPage() {
           }}
         />
       )}
+
+      {/* Reset Password Modal */}
+      {showResetPassword && (
+        <ResetPasswordModal
+          users={users}
+          onClose={() => setShowResetPassword(false)}
+          onSaved={(msg) => {
+            setShowResetPassword(false);
+            toast.success(msg);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+export default function UsersPage() {
+  return <UsersContent />;
 }
 
 // ─── Create / Edit Modal ────────────────────────
 
 interface ModalProps {
   user: UserRecord | null;
-  headers: Record<string, string>;
   roles: RoleOption[];
+  contractors: ContractorOption[];
   onClose: () => void;
   onSaved: (setupLink?: string) => void;
 }
 
-function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
+function UserModal({ user, roles, contractors, onClose, onSaved }: ModalProps) {
   const isEdit = !!user;
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -327,9 +349,8 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
   const loadDefaults = async (r: string) => {
     if (isEdit) return;
     try {
-      const res = await fetch(`${API_BASE}/users/role-defaults/${r}`, { headers });
-      const data = await res.json();
-      if (res.ok) setPermissions(data.permissions);
+      const data = await api.get<{ permissions: Record<string, boolean> }>(`/users/role-defaults/${r}`);
+      setPermissions(data.permissions);
     } catch { /* ignore */ }
   };
 
@@ -343,27 +364,17 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
     setSubmitting(true);
 
     try {
-      const url = isEdit ? `${API_BASE}/users/${user!.id}` : `${API_BASE}/users`;
-      const method = isEdit ? 'PUT' : 'POST';
       const body = isEdit
         ? { name, role, contractor: contractor || null, permissions }
         : { name, email, role, contractor: contractor || null };
 
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Failed to save user');
-        return;
-      }
+      const data = isEdit
+        ? await api.put<{ setupUrl?: string }>(`/users/${user!.id}`, body)
+        : await api.post<{ setupUrl?: string }>('/users', body);
 
       onSaved(data.setupUrl);
-    } catch {
-      setError('Network error');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save user');
     } finally {
       setSubmitting(false);
     }
@@ -438,8 +449,8 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
               className="w-full h-[42px] px-3 bg-surface border border-border rounded-[var(--radius-sm)] text-[14px] text-text-primary outline-none transition-all duration-150 focus:border-primary-500 focus:ring-3 focus:ring-primary-100"
             >
               <option value="">None (Internal)</option>
-              {CONTRACTORS.map(c => (
-                <option key={c} value={c}>{c}</option>
+              {contractors.map(c => (
+                <option key={c.id} value={c.contractor_name}>{c.contractor_name}</option>
               ))}
             </select>
           </div>
@@ -480,6 +491,176 @@ function UserModal({ user, headers, roles, onClose, onSaved }: ModalProps) {
             )}
           </div>
         )}
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Reset Password Modal ────────────────────────
+
+interface ResetPasswordModalProps {
+  users: UserRecord[];
+  onClose: () => void;
+  onSaved: (message: string) => void;
+}
+
+function ResetPasswordModal({ users, onClose, onSaved }: ResetPasswordModalProps) {
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const selectedUser = users.find(u => u.id === selectedUserId) || null;
+  const activeUsers = users.filter(u => u.isActive);
+  const filteredUsers = activeUsers.filter(u =>
+    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const passwordValid = newPassword.length >= 8
+    && /[A-Z]/.test(newPassword)
+    && /[a-z]/.test(newPassword)
+    && /[0-9]/.test(newPassword)
+    && /[^A-Za-z0-9]/.test(newPassword);
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) {
+      setError('Please select a user first.');
+      return;
+    }
+    if (!passwordValid) {
+      setError('Password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+      return;
+    }
+    if (!passwordsMatch) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.put(`/users/${selectedUser.id}/reset-password`, {
+        new_password: newPassword,
+        new_password_confirmation: confirmPassword,
+      });
+      onSaved(`Password for "${selectedUser.name}" has been reset successfully`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset password');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const inputCls = 'w-full h-[42px] px-3 bg-surface border border-border rounded-[var(--radius-sm)] text-[14px] text-text-primary placeholder:text-text-tertiary outline-none transition-all duration-150 focus:border-primary-500 focus:ring-3 focus:ring-primary-100';
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="Reset Password"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            icon={<KeyRound size={16} />}
+            loading={submitting}
+            disabled={!selectedUser || !passwordValid || !passwordsMatch}
+            onClick={() => { const form = document.getElementById('reset-pw-form') as HTMLFormElement; form?.requestSubmit(); }}
+          >
+            Reset Password
+          </Button>
+        </>
+      }
+    >
+      <form id="reset-pw-form" onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-danger-50 border border-danger-100 text-danger-700 rounded-[var(--radius-md)] px-4 py-3 text-[13px]">{error}</div>
+        )}
+
+        {/* User selector */}
+        <div>
+          <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Select User</label>
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search by name or email..."
+              className={`${inputCls} pl-8`}
+            />
+          </div>
+          <div className="border border-border rounded-[var(--radius-sm)] max-h-[180px] overflow-y-auto">
+            {filteredUsers.length === 0 ? (
+              <div className="px-3 py-4 text-center text-[12px] text-text-tertiary">No users found</div>
+            ) : (
+              filteredUsers.map(u => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => { setSelectedUserId(u.id); setSearchQuery(''); }}
+                  className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-2 text-[13px] transition-colors duration-100 border-b border-border last:border-0 ${
+                    selectedUserId === u.id
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'hover:bg-surface-sunken text-text-primary'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{u.name}</p>
+                    <p className={`text-[11px] truncate ${selectedUserId === u.id ? 'text-primary-500' : 'text-text-tertiary'}`}>{u.email}</p>
+                  </div>
+                  {selectedUserId === u.id && <Check size={14} className="shrink-0 text-primary-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Selected user info */}
+        {selectedUser && (
+          <div className="bg-surface-sunken border border-border rounded-[var(--radius-md)] p-3">
+            <p className="text-[13px] text-text-secondary">
+              Resetting password for <span className="font-semibold text-text-primary">{selectedUser.name}</span>
+            </p>
+            <p className="text-[11px] text-text-tertiary mt-0.5">{selectedUser.email}</p>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-[13px] font-medium text-text-secondary mb-1.5">New Password</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            required
+            placeholder="Min 8 chars, upper, lower, number, special"
+            className={inputCls}
+          />
+          {newPassword && !passwordValid && (
+            <p className="text-[11px] text-danger-600 mt-1">Must be 8+ chars with uppercase, lowercase, number, and special character.</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Confirm Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            required
+            placeholder="Re-enter password"
+            className={inputCls}
+          />
+          {confirmPassword && !passwordsMatch && (
+            <p className="text-[11px] text-danger-600 mt-1">Passwords do not match.</p>
+          )}
+        </div>
       </form>
     </Modal>
   );

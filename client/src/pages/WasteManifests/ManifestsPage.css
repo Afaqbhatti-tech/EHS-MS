@@ -1,0 +1,51 @@
+/* Waste Manifests Page — follows existing module patterns */
+
+@keyframes manifest-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.manifest-page {
+  animation: manifest-fade-in 0.3s ease-out;
+}
+
+/* Action buttons */
+.env-table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.env-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm, 6px);
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary, #9CA3AF);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.env-action-btn:hover {
+  transform: scale(1.08);
+}
+
+.env-action-btn--view:hover {
+  color: var(--color-primary-600, #16803A);
+  background: var(--color-primary-50, #F0FDF4);
+}
+
+.env-action-btn--edit:hover {
+  color: var(--color-warning-600, #D97706);
+  background: #FFFBEB;
+}
+
+.env-action-btn--delete:hover {
+  color: var(--color-danger, #DC2626);
+  background: #FEF2F2;
+}

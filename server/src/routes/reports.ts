@@ -12,6 +12,19 @@ export const reportsRouter = Router();
 reportsRouter.use(requireAuth);
 reportsRouter.use(requirePermission('can_access_kpis_reports'));
 
+// Tables that support soft deletes (have deleted_at column)
+const SOFT_DELETE_TABLES = new Set([
+  'observations', 'permits', 'incidents', 'violations', 'training_records',
+  'waste_manifests', 'mockups', 'moms', 'mock_drills', 'campaigns',
+  'workers', 'tracker_records', 'tracker_categories', 'checklist_categories',
+  'checklist_items', 'checklist_inspections', 'permit_amendments',
+  'posters', 'dc_documents', 'contractors', 'erps',
+  'environmental_aspects', 'environmental_risks', 'waste_records',
+  'environmental_incidents', 'environmental_inspections',
+  'environmental_compliance_register', 'environmental_objectives',
+  'equipment_groups', 'equipment_items', 'equipment_registers', 'equipment_registry_groups',
+]);
+
 // ─── Helpers ────────────────────────────────────────
 function fmtTs(d: Date): string { return format(d, 'yyyy-MM-dd HH:mm:ss'); }
 function fmtDt(d: Date): string { return format(d, 'yyyy-MM-dd'); }
@@ -41,11 +54,13 @@ function dateRange(period: string, dateStr?: string) {
 }
 
 // Count records in a table within a date range, with optional contractor filter
+// Automatically excludes soft-deleted records for tables that support it
 async function cnt(
   table: string, dateCol: string, s: string, e: string,
   cField?: string, cVal?: string,
 ): Promise<number> {
-  let sql = `SELECT COUNT(*) as c FROM \`${table}\` WHERE \`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
+  const sd = SOFT_DELETE_TABLES.has(table) ? 'deleted_at IS NULL AND ' : '';
+  let sql = `SELECT COUNT(*) as c FROM \`${table}\` WHERE ${sd}\`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
   const p: any[] = [s, e];
   if (cField && cVal) { sql += ` AND \`${cField}\` = ?`; p.push(cVal); }
   const rows: any[] = await query(sql, p);
@@ -53,11 +68,13 @@ async function cnt(
 }
 
 // Group by a column within a date range
+// Automatically excludes soft-deleted records for tables that support it
 async function grp(
   table: string, groupCol: string, dateCol: string, s: string, e: string,
   cField?: string, cVal?: string,
 ): Promise<{ label: string; value: number }[]> {
-  let sql = `SELECT \`${groupCol}\` as label, COUNT(*) as value FROM \`${table}\` WHERE \`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
+  const sd = SOFT_DELETE_TABLES.has(table) ? 'deleted_at IS NULL AND ' : '';
+  let sql = `SELECT \`${groupCol}\` as label, COUNT(*) as value FROM \`${table}\` WHERE ${sd}\`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
   const p: any[] = [s, e];
   if (cField && cVal) { sql += ` AND \`${cField}\` = ?`; p.push(cVal); }
   sql += ` GROUP BY \`${groupCol}\``;
@@ -66,11 +83,13 @@ async function grp(
 }
 
 // Daily trend counts
+// Automatically excludes soft-deleted records for tables that support it
 async function dailyTrend(
   table: string, dateCol: string, s: string, e: string,
   cField?: string, cVal?: string,
 ): Promise<Record<string, number>> {
-  let sql = `SELECT DATE(\`${dateCol}\`) as d, COUNT(*) as c FROM \`${table}\` WHERE \`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
+  const sd = SOFT_DELETE_TABLES.has(table) ? 'deleted_at IS NULL AND ' : '';
+  let sql = `SELECT DATE(\`${dateCol}\`) as d, COUNT(*) as c FROM \`${table}\` WHERE ${sd}\`${dateCol}\` >= ? AND \`${dateCol}\` <= ?`;
   const p: any[] = [s, e];
   if (cField && cVal) { sql += ` AND \`${cField}\` = ?`; p.push(cVal); }
   sql += ' GROUP BY d ORDER BY d';
@@ -124,17 +143,17 @@ reportsRouter.get('/data', async (req: Request, res: Response) => {
       cnt('permits', 'created_at', s, e, 'contractor', cf),
       grp('permits', 'status', 'created_at', s, e, 'contractor', cf),
       dailyTrend('permits', 'created_at', s, e, 'contractor', cf),
-      // Incidents
-      cnt('incidents', 'created_at', s, e, 'contractor', cf),
-      grp('incidents', 'severity', 'created_at', s, e, 'contractor', cf),
-      dailyTrend('incidents', 'created_at', s, e, 'contractor', cf),
-      // Violations
-      cnt('violations', 'created_at', s, e, 'contractor', cf),
-      grp('violations', 'severity', 'created_at', s, e, 'contractor', cf),
-      // Manpower aggregate
+      // Incidents (uses contractor_name column)
+      cnt('incidents', 'created_at', s, e, 'contractor_name', cf),
+      grp('incidents', 'severity', 'created_at', s, e, 'contractor_name', cf),
+      dailyTrend('incidents', 'created_at', s, e, 'contractor_name', cf),
+      // Violations (uses contractor_name column)
+      cnt('violations', 'created_at', s, e, 'contractor_name', cf),
+      grp('violations', 'severity', 'created_at', s, e, 'contractor_name', cf),
+      // Manpower aggregate (columns: headcount, man_hours) — no soft deletes on this table
       (async () => {
-        let sql = `SELECT COUNT(*) as records, COALESCE(SUM(total_headcount),0) as headcount,
-                   COALESCE(SUM(total_manhours),0) as manhours
+        let sql = `SELECT COUNT(*) as records, COALESCE(SUM(headcount),0) as headcount,
+                   COALESCE(SUM(man_hours),0) as manhours
                    FROM manpower_records WHERE created_at >= ? AND created_at <= ?`;
         const p: any[] = [s, e];
         if (cf) { sql += ' AND contractor = ?'; p.push(cf); }
@@ -145,34 +164,34 @@ reportsRouter.get('/data', async (req: Request, res: Response) => {
       // Equipment
       cnt('equipment', 'created_at', s, e),
       grp('equipment', 'status', 'created_at', s, e),
-      // Training
+      // Training (group by status, not result)
       cnt('training_records', 'created_at', s, e),
-      grp('training_records', 'result', 'created_at', s, e),
-      // Waste manifests
-      cnt('waste_manifests', 'created_at', s, e, 'contractor', cf),
-      grp('waste_manifests', 'manifest_status', 'created_at', s, e, 'contractor', cf),
-      // Mockups
+      grp('training_records', 'status', 'created_at', s, e),
+      // Waste manifests (no contractor text column, column is "status" not "manifest_status")
+      cnt('waste_manifests', 'created_at', s, e),
+      grp('waste_manifests', 'status', 'created_at', s, e),
+      // Mockups (column is "status" not "overall_status")
       cnt('mockups', 'created_at', s, e, 'contractor', cf),
-      grp('mockups', 'overall_status', 'created_at', s, e, 'contractor', cf),
+      grp('mockups', 'status', 'created_at', s, e, 'contractor', cf),
       // MOMs, Drills, Campaigns, Documents
       cnt('moms', 'created_at', s, e),
       cnt('mock_drills', 'created_at', s, e),
       cnt('campaigns', 'created_at', s, e),
-      cnt('documents', 'created_at', s, e),
+      cnt('dc_documents', 'created_at', s, e),
       // Contractor breakdown
       (async () => {
         try {
           const rows: any[] = await query(`
             SELECT t.contractor,
-              COALESCE((SELECT COUNT(*) FROM observations  WHERE contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as observations,
-              COALESCE((SELECT COUNT(*) FROM permits       WHERE contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as permits,
-              COALESCE((SELECT COUNT(*) FROM incidents     WHERE contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as incidents,
-              COALESCE((SELECT COUNT(*) FROM violations    WHERE contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as violations
+              COALESCE((SELECT COUNT(*) FROM observations  WHERE deleted_at IS NULL AND contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as observations,
+              COALESCE((SELECT COUNT(*) FROM permits       WHERE deleted_at IS NULL AND contractor = t.contractor AND created_at >= ? AND created_at <= ?), 0) as permits,
+              COALESCE((SELECT COUNT(*) FROM incidents     WHERE deleted_at IS NULL AND contractor_name = t.contractor AND created_at >= ? AND created_at <= ?), 0) as incidents,
+              COALESCE((SELECT COUNT(*) FROM violations    WHERE deleted_at IS NULL AND contractor_name = t.contractor AND created_at >= ? AND created_at <= ?), 0) as violations
             FROM (
-              SELECT DISTINCT contractor FROM observations WHERE contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
-              UNION SELECT DISTINCT contractor FROM permits WHERE contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
-              UNION SELECT DISTINCT contractor FROM incidents WHERE contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
-              UNION SELECT DISTINCT contractor FROM violations WHERE contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
+              SELECT DISTINCT contractor FROM observations WHERE deleted_at IS NULL AND contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
+              UNION SELECT DISTINCT contractor FROM permits WHERE deleted_at IS NULL AND contractor IS NOT NULL AND contractor != '' AND created_at >= ? AND created_at <= ?
+              UNION SELECT DISTINCT contractor_name as contractor FROM incidents WHERE deleted_at IS NULL AND contractor_name IS NOT NULL AND contractor_name != '' AND created_at >= ? AND created_at <= ?
+              UNION SELECT DISTINCT contractor_name as contractor FROM violations WHERE deleted_at IS NULL AND contractor_name IS NOT NULL AND contractor_name != '' AND created_at >= ? AND created_at <= ?
             ) t ORDER BY t.contractor
           `, [s,e, s,e, s,e, s,e, s,e, s,e, s,e, s,e]);
           return rows.map((r: any) => ({
@@ -186,37 +205,42 @@ reportsRouter.get('/data', async (req: Request, res: Response) => {
       })(),
       // Detailed records (unified activity feed)
       (async () => {
-        const cFilter = cf ? 'AND contractor = ?' : '';
+        // Each table uses its own contractor column name
+        const obsFilter = cf ? 'AND contractor = ?' : '';
+        const permFilter = cf ? 'AND contractor = ?' : '';
+        const incFilter = cf ? 'AND contractor_name = ?' : '';
+        const violFilter = cf ? 'AND contractor_name = ?' : '';
+        const mockFilter = cf ? 'AND contractor = ?' : '';
         const cParams = cf ? [cf] : [];
         const limitClause = isExport ? '' : `LIMIT ${limit} OFFSET ${(page - 1) * limit}`;
 
         const rows: any[] = await query(`
           SELECT * FROM (
-            SELECT 'Observation' as module, observation_id as record_id,
+            SELECT 'Observation' as module, ref_number as record_id,
                    LEFT(description, 150) as title, status, priority as severity,
-                   contractor, area, created_at
-            FROM observations WHERE created_at >= ? AND created_at <= ? ${cFilter}
+                   contractor, zone as area, created_at
+            FROM observations WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ? ${obsFilter}
             UNION ALL
-            SELECT 'Permit', permit_id, LEFT(work_description, 150), status, NULL,
+            SELECT 'Permit', ref_number, LEFT(work_description, 150), status, NULL,
                    contractor, zone, created_at
-            FROM permits WHERE created_at >= ? AND created_at <= ? ${cFilter}
+            FROM permits WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ? ${permFilter}
             UNION ALL
-            SELECT 'Incident', incident_id, LEFT(description, 150), status, severity,
+            SELECT 'Incident', incident_code, LEFT(description, 150), status, severity,
+                   contractor_name as contractor, area, created_at
+            FROM incidents WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ? ${incFilter}
+            UNION ALL
+            SELECT 'Violation', violation_code, LEFT(description, 150),
+                   CONCAT(COALESCE(severity,''), ' - ', COALESCE(violation_type,'')), severity,
+                   contractor_name as contractor, area, created_at
+            FROM violations WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ? ${violFilter}
+            UNION ALL
+            SELECT 'Waste Manifest', manifest_code, LEFT(COALESCE(waste_description,''), 150),
+                   status, NULL, generator_company as contractor, source_area as area, created_at
+            FROM waste_manifests WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ?
+            UNION ALL
+            SELECT 'Mock-Up', ref_number, title, status, NULL,
                    contractor, area, created_at
-            FROM incidents WHERE created_at >= ? AND created_at <= ? ${cFilter}
-            UNION ALL
-            SELECT 'Violation', violation_id, LEFT(description, 150),
-                   CONCAT(COALESCE(severity,''), ' - ', COALESCE(action_type,'')), severity,
-                   contractor, area, created_at
-            FROM violations WHERE created_at >= ? AND created_at <= ? ${cFilter}
-            UNION ALL
-            SELECT 'Waste Manifest', manifest_id, LEFT(COALESCE(waste_description,''), 150),
-                   manifest_status, NULL, contractor, area, created_at
-            FROM waste_manifests WHERE created_at >= ? AND created_at <= ? ${cFilter}
-            UNION ALL
-            SELECT 'Mock-Up', mockup_id, title, overall_status, NULL,
-                   contractor, area, created_at
-            FROM mockups WHERE created_at >= ? AND created_at <= ? ${cFilter}
+            FROM mockups WHERE deleted_at IS NULL AND created_at >= ? AND created_at <= ? ${mockFilter}
           ) combined
           ORDER BY created_at DESC
           ${limitClause}
@@ -225,7 +249,7 @@ reportsRouter.get('/data', async (req: Request, res: Response) => {
           s, e, ...cParams,
           s, e, ...cParams,
           s, e, ...cParams,
-          s, e, ...cParams,
+          s, e,
           s, e, ...cParams,
         ]);
         return rows;
@@ -285,13 +309,12 @@ reportsRouter.get('/contractors', async (_req: Request, res: Response) => {
   try {
     const rows: any[] = await query(`
       SELECT DISTINCT contractor FROM (
-        SELECT DISTINCT contractor FROM observations WHERE contractor IS NOT NULL AND contractor != ''
-        UNION SELECT DISTINCT contractor FROM permits WHERE contractor IS NOT NULL AND contractor != ''
-        UNION SELECT DISTINCT contractor FROM incidents WHERE contractor IS NOT NULL AND contractor != ''
-        UNION SELECT DISTINCT contractor FROM violations WHERE contractor IS NOT NULL AND contractor != ''
+        SELECT DISTINCT contractor FROM observations WHERE deleted_at IS NULL AND contractor IS NOT NULL AND contractor != ''
+        UNION SELECT DISTINCT contractor FROM permits WHERE deleted_at IS NULL AND contractor IS NOT NULL AND contractor != ''
+        UNION SELECT DISTINCT contractor_name as contractor FROM incidents WHERE deleted_at IS NULL AND contractor_name IS NOT NULL AND contractor_name != ''
+        UNION SELECT DISTINCT contractor_name as contractor FROM violations WHERE deleted_at IS NULL AND contractor_name IS NOT NULL AND contractor_name != ''
         UNION SELECT DISTINCT contractor FROM manpower_records WHERE contractor IS NOT NULL AND contractor != ''
-        UNION SELECT DISTINCT contractor FROM waste_manifests WHERE contractor IS NOT NULL AND contractor != ''
-        UNION SELECT DISTINCT contractor FROM mockups WHERE contractor IS NOT NULL AND contractor != ''
+        UNION SELECT DISTINCT contractor FROM mockups WHERE deleted_at IS NULL AND contractor IS NOT NULL AND contractor != ''
       ) t ORDER BY contractor
     `);
     res.json(rows.map((r: any) => r.contractor));

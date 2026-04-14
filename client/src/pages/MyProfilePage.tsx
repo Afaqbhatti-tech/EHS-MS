@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, Lock, Eye, EyeOff, Check, X, Save } from 'lucide-react';
+import { User, Mail, Phone, Lock, Eye, EyeOff, Check, X as XIcon, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import Input from '../components/ui/Input';
@@ -69,11 +69,11 @@ export default function MyProfilePage() {
     setProfileSuccess(false);
 
     try {
-      const res = await api.put<{ user: any }>('/auth/profile', { name: name.trim(), phone: phone.trim() });
+      const res = await api.put<{ user: any }>('/auth/profile', { name: name.trim(), phone: phone.trim() || null });
       updateUser({
         ...user!,
-        name: res.user.name,
-        phone: res.user.phone,
+        name: res.user.fullName || res.user.name,
+        phone: res.user.phone ?? null,
       });
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
@@ -125,7 +125,7 @@ export default function MyProfilePage() {
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-semibold text-text-primary truncate">{user?.name}</h1>
           <p className="text-[12px] sm:text-[13px] text-text-tertiary truncate">{user?.email}</p>
-          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-50 text-primary-700 border border-primary-100">
+          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-primary-100 text-primary-800 border border-primary-200">
             {ROLE_LABELS[user?.role || ''] || user?.role}
           </span>
         </div>
@@ -141,7 +141,7 @@ export default function MyProfilePage() {
         <form onSubmit={handleProfileSave} className="px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {profileError && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-100 rounded-[var(--radius-md)] text-[13px] text-danger-700">
-              <X size={14} className="shrink-0 mt-0.5" />
+              <XIcon size={14} className="shrink-0 mt-0.5" />
               {profileError}
             </div>
           )}
@@ -204,7 +204,7 @@ export default function MyProfilePage() {
         <form onSubmit={handlePasswordChange} className="px-4 sm:px-6 py-4 sm:py-5 space-y-5">
           {passwordError && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-100 rounded-[var(--radius-md)] text-[13px] text-danger-700">
-              <X size={14} className="shrink-0 mt-0.5" />
+              <XIcon size={14} className="shrink-0 mt-0.5" />
               {passwordError}
             </div>
           )}

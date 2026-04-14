@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell, Eye, ClipboardCheck, AlertTriangle, Clock,
   Settings, FileText, BarChart3, Shield,
-  Check, CheckCheck, X, Loader2,
+  Check, CheckCheck, X as XIcon, Loader2,
   type LucideIcon,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
 // ─── Types ─────────────────────────────────────────
@@ -53,7 +54,9 @@ export default function NotificationPanel() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const panelRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Close on outside click
   useEffect(() => {
@@ -65,6 +68,11 @@ export default function NotificationPanel() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Reset scroll position when filter changes
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [filter]);
 
   // Fetch notifications
   const { data, isLoading } = useQuery<NotificationsResponse>({
@@ -115,8 +123,13 @@ export default function NotificationPanel() {
       markRead.mutate(n.id);
     }
     if (n.link) {
-      window.location.href = n.link;
       setOpen(false);
+      // Use SPA navigation for internal links, external for others
+      if (n.link.startsWith('/')) {
+        navigate(n.link);
+      } else {
+        window.location.href = n.link;
+      }
     }
   }
 
@@ -179,7 +192,7 @@ export default function NotificationPanel() {
           </div>
 
           {/* Notification List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" ref={listRef}>
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 size={20} className="animate-spin text-text-tertiary" />
@@ -238,7 +251,7 @@ export default function NotificationPanel() {
                               className="p-1 rounded hover:bg-danger-50 text-text-tertiary hover:text-danger-600 transition-colors"
                               title="Remove"
                             >
-                              <X size={12} />
+                              <XIcon size={12} />
                             </button>
                           </div>
                         </div>

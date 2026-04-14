@@ -4,6 +4,19 @@ namespace App\Constants;
 
 class Permissions
 {
+    /**
+     * Flat list of ALL permission keys — auto-derived from PermissionRegistry.
+     * Kept as a static method so it stays in sync automatically.
+     */
+    public static function all(): array
+    {
+        return PermissionRegistry::allKeys();
+    }
+
+    /**
+     * Legacy constant for backward compat — DO NOT add new keys here.
+     * New permissions should be added to PermissionRegistry::REGISTRY instead.
+     */
     public const ALL = [
         // Module Access
         'can_access_ai_intelligence',
@@ -18,12 +31,25 @@ class Permissions
         'can_manage_users', 'can_manage_roles',
         // Feature Permissions
         'can_create_observation', 'can_verify_observation', 'can_close_observation',
-        'can_create_incident', 'can_investigate_incident', 'can_issue_warning',
+        'can_create_violation', 'can_edit_violation', 'can_assign_violation',
+        'can_investigate_violation', 'can_close_violation', 'can_export_violations', 'can_delete_violation',
+        'can_create_incident', 'can_edit_incident', 'can_assign_incident',
+        'can_investigate_incident', 'can_close_incident', 'can_export_incidents', 'can_delete_incident',
+        'can_issue_warning',
         'can_record_permit', 'can_approve_permit',
-        'can_inspect_equipment', 'can_manage_training',
+        'can_inspect_equipment', 'can_manage_equipment_categories',
+        'can_manage_equipment_items', 'can_import_equipment', 'can_export_equipment', 'can_restore_equipment',
+        'can_manage_training',
+        'can_create_training', 'can_edit_training', 'can_delete_training',
+        'can_bulk_assign_training', 'can_export_training', 'can_manage_training_requirements',
+        'section_training_certifications', 'section_training_expiring',
+        'section_training_compliance', 'section_training_audit_logs',
+        'data_training_worker_details',
         'can_manage_manpower', 'can_manage_drills', 'can_manage_campaigns',
         'can_upload_documents', 'can_upload_rams', 'can_approve_rams', 'can_generate_ai_ra', 'can_review_ai_drafts',
         'can_export_reports', 'can_manage_posters', 'can_view_management_dashboard',
+        'can_import_documents',
+        'can_access_document_control', 'can_manage_document_control', 'can_review_documents', 'can_approve_documents',
     ];
 
     public const CONTRACTORS = ['CCCC', 'CCC Rail', 'Artal', 'FFT Direct'];

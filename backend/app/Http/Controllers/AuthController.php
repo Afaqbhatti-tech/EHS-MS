@@ -170,10 +170,34 @@ class AuthController extends Controller
         ]);
 
         // Revoke all other tokens so other sessions are logged out
-        $currentTokenId = $user->currentAccessToken()->id;
-        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken) {
+            $user->tokens()->where('id', '!=', $currentToken->id)->delete();
+        }
 
         return response()->json(['message' => 'Password changed successfully.']);
+    }
+
+    /**
+     * PUT /api/auth/profile
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:50',
+        ]);
+
+        $user = $request->user();
+        $user->update([
+            'full_name' => $request->input('name'),
+            'phone' => $request->input('phone'),
+        ]);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $this->formatUser($user->fresh()),
+        ]);
     }
 
     /**
@@ -229,6 +253,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'username' => $user->username,
             'fullName' => $user->full_name,
+            'phone' => $user->phone,
             'role' => $user->role,
             'contractor' => $user->contractor,
             'permissions' => $user->permissions ?? [],

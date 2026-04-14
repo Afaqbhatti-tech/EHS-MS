@@ -29,12 +29,37 @@ export interface ComplianceScore {
   target: number;
 }
 
+export interface AiInsight {
+  text: string;
+  severity: 'warning' | 'danger' | 'success';
+}
+
+export interface VisibleSections {
+  incident_free_days: boolean;
+  man_hours: boolean;
+  active_permits: boolean;
+  open_observations: boolean;
+  pending_amendments: boolean;
+  mom_open_actions: boolean;
+  mockup_pending: boolean;
+  open_violations: boolean;
+  env_manifests: boolean;
+  safety_chart: boolean;
+  quick_operations: boolean;
+  recent_activity: boolean;
+  ai_insights: boolean;
+  compliance_scorecard: boolean;
+}
+
 export interface DashboardData {
   greeting: string;
   stats: DashboardStat[];
   monthlyTrend: MonthlyTrend[];
   recentActivity: ActivityItem[];
   complianceScores: ComplianceScore[];
+  aiInsights: AiInsight[];
+  sparkTrends: Record<string, number[]>;
+  visibleSections?: VisibleSections;
 }
 
 export function useDashboardData() {

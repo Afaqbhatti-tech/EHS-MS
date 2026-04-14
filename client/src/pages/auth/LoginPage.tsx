@@ -125,7 +125,7 @@ export default function LoginPage() {
                     id="identifier"
                     type="text"
                     value={identifier}
-                    onChange={e => setIdentifier(e.target.value)}
+                    onChange={e => { setIdentifier(e.target.value); if (error) setError(''); }}
                     required
                     autoComplete="username"
                     autoFocus
@@ -146,7 +146,7 @@ export default function LoginPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={e => { setPassword(e.target.value); if (error) setError(''); }}
                     required
                     autoComplete="current-password"
                     className="w-full h-[42px] pl-9 pr-10 bg-white border border-border rounded-[var(--radius-sm)] text-[14px] text-text-primary placeholder:text-text-tertiary outline-none transition-all duration-150 focus:border-primary-500 focus:ring-3 focus:ring-primary-100"

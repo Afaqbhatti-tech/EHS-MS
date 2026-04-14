@@ -4,11 +4,13 @@ import { api } from '../../services/api';
 import {
   X, Download, FileText, User, Calendar, Clock,
   CheckCircle2, XCircle, Send, RotateCcw, Upload, AlertTriangle,
+  Layers, ShieldCheck, AlertOctagon, MessageSquare, Trash2,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { StatusBadge } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { PageSpinner } from '../../components/ui/Spinner';
+import TypedDeleteConfirmModal from '../../components/ui/TypedDeleteConfirmModal';
 
 // ─── Types ──────────────────────────────────────
 interface VersionData {
@@ -45,7 +47,30 @@ interface DocDetail {
   updated_at: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+interface LinkedMockup {
+  id: string;
+  ref_number: string;
+  title: string;
+  approval_status: string;
+  revision_number: number;
+  can_proceed: boolean;
+  compliance_status: string | null;
+  mockup_type: string | null;
+  created_at: string;
+}
+
+const MOCKUP_STATUS_STYLES: Record<string, string> = {
+  'Draft': 'bg-gray-100 text-gray-700 border-gray-200',
+  'Submitted for Review': 'bg-blue-50 text-blue-700 border-blue-200',
+  'Approved': 'bg-green-50 text-green-700 border-green-200',
+  'Rejected': 'bg-red-50 text-red-700 border-red-200',
+  'Approved with Comments': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Pending Compliance': 'bg-orange-50 text-orange-700 border-orange-200',
+  'Comments Resolved': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Re-submitted': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  'Superseded': 'bg-gray-100 text-gray-500 border-gray-200',
+};
 
 interface Props {
   documentId: string;
@@ -63,11 +88,21 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
   const [uploadNotes, setUploadNotes] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: doc, isLoading } = useQuery<DocDetail>({
     queryKey: ['rams-document', documentId],
     queryFn: () => api.get(`/rams/documents/${documentId}`),
+  });
+
+  const { data: linkedMockups = [] } = useQuery<LinkedMockup[]>({
+    queryKey: ['rams-linked-mockups', documentId],
+    queryFn: async () => {
+      const res = await api.get<{ data: LinkedMockup[] }>(`/mockups?rams_document_id=${documentId}&per_page=50`);
+      return res.data || [];
+    },
+    enabled: !!documentId,
   });
 
   const invalidate = () => {
@@ -79,25 +114,20 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
 
   const statusMutation = useMutation({
     mutationFn: (payload: { status: string; rejected_reason?: string }) =>
-      fetch(`${API_BASE}/rams/documents/${documentId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('ehs_token')}`,
-          'ngrok-skip-browser-warning': '1',
-        },
-        body: JSON.stringify(payload),
-      }).then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ message: res.statusText }));
-          throw new Error(err.message || 'Failed');
-        }
-        return res.json();
-      }),
+      api.patch(`/rams/documents/${documentId}/status`, payload),
     onSuccess: () => {
       invalidate();
       setShowReject(false);
       setRejectReason('');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/rams/documents/${documentId}`),
+    onSuccess: () => {
+      invalidate();
+      setShowDeleteConfirm(false);
+      onClose();
     },
   });
 
@@ -106,17 +136,7 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
       const fd = new FormData();
       fd.append('file', file);
       if (uploadNotes) fd.append('notes', uploadNotes);
-      return fetch(`${API_BASE}/rams/documents/${documentId}/versions`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('ehs_token')}`, 'ngrok-skip-browser-warning': '1' },
-        body: fd,
-      }).then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ message: res.statusText }));
-          throw new Error(err.message || 'Upload failed');
-        }
-        return res.json();
-      });
+      return api.uploadForm(`/rams/documents/${documentId}/versions`, fd);
     },
     onSuccess: () => {
       invalidate();
@@ -132,17 +152,7 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
   };
 
   const handleDownload = (versionId: string, fileName: string) => {
-    const token = localStorage.getItem('ehs_token');
-    const url = `${API_BASE}/rams/versions/${versionId}/download`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': '1' } })
-      .then(res => res.blob())
-      .then(blob => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
+    api.download(`/rams/versions/${versionId}/download`, fileName);
   };
 
   const formatBytes = (bytes: number) => {
@@ -165,15 +175,21 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
 
-      <div className="relative w-full max-w-full sm:max-w-lg bg-surface shadow-xl overflow-y-auto">
+      <div className="relative w-full max-w-full sm:max-w-lg bg-surface shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-surface border-b border-border px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between z-10">
+        <div className="shrink-0 bg-surface border-b border-border px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-[17px] font-bold text-text-primary">Document Details</h2>
-          <button onClick={onClose} className="p-1 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-tertiary transition-colors duration-150">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setShowDeleteConfirm(true)} className="p-1.5 rounded-[var(--radius-sm)] hover:bg-danger-50 text-text-tertiary hover:text-danger-600 transition-colors duration-150" title="Delete Document">
+              <Trash2 size={16} />
+            </button>
+            <button onClick={onClose} className="p-1 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-tertiary transition-colors duration-150">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
+        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
         {isLoading && <PageSpinner label="Loading..." />}
 
         {doc && (
@@ -200,7 +216,7 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
             )}
 
             {/* Metadata grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {doc.contractor && <MetaItem label="Contractor" value={doc.contractor} />}
               {doc.zone && <MetaItem label="Zone" value={doc.zone} />}
               {doc.due_date && <MetaItem label="Due Date" value={formatDate(doc.due_date)} icon={<Calendar size={12} />} />}
@@ -350,6 +366,39 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
               <p className="text-[11px] text-danger-600">{(statusMutation.error as Error).message}</p>
             )}
 
+            {/* Linked Mock-Ups */}
+            {linkedMockups.length > 0 && (
+              <div>
+                <h4 className="text-[13px] font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+                  <Layers size={14} className="text-text-tertiary" />
+                  Linked Mock-Ups ({linkedMockups.length})
+                </h4>
+                <div className="space-y-2">
+                  {linkedMockups.map(m => (
+                    <div key={m.id} className="bg-surface-sunken border border-border rounded-[var(--radius-md)] p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[11px] font-mono text-text-tertiary shrink-0">{m.ref_number}</span>
+                          <span className="text-[12px] font-medium text-text-primary truncate">{m.title}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-text-tertiary shrink-0 ml-2">Rev {m.revision_number}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`inline-flex items-center px-1.5 py-[1px] rounded-full text-[10px] font-semibold border ${
+                          MOCKUP_STATUS_STYLES[m.approval_status] || 'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}>
+                          {m.approval_status}
+                        </span>
+                        {m.can_proceed && <ShieldCheck size={12} className="text-green-600" title="Can Proceed" />}
+                        {m.compliance_status === 'Pending' && <AlertTriangle size={12} className="text-orange-600" title="Pending Compliance" />}
+                        {m.mockup_type && <span className="text-[10px] text-text-tertiary">{m.mockup_type}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Versions list */}
             <div>
               <h4 className="text-[13px] font-semibold text-text-primary mb-2">
@@ -390,7 +439,17 @@ export default function DocumentDetailDrawer({ documentId, onClose, workLineSlug
             </div>
           </div>
         )}
+        </div>
       </div>
+
+      <TypedDeleteConfirmModal
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        itemType="RAMS Document"
+        itemName={doc?.title}
+        message="This document and all its versions will be permanently deleted."
+      />
     </div>
   );
 }

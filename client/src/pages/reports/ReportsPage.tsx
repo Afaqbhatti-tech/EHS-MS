@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Calendar,
   Eye, ClipboardCheck, AlertTriangle, Ban, Users, Wrench,
   GraduationCap, Truck, ClipboardList, Siren, Megaphone,
-  FolderOpen, FileJson, FileType,
+  FolderOpen, FileJson, FileType, Presentation,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -16,7 +16,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  exportExcel, exportCSV, exportPDF, exportWord, exportJSON,
+  exportExcel, exportCSV, exportPDF, exportWord, exportPowerPoint, exportJSON,
   copyToClipboard, printReport,
   type ExportData, type ReportMeta,
 } from './utils/exportUtils';
@@ -26,6 +26,7 @@ import { SectionCard } from '../../components/ui/Card';
 import { PageSpinner } from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
+import { useToast } from '../../components/ui/Toast';
 
 // ─── Types ──────────────────────────────────────────
 type Period = 'daily' | 'weekly' | 'monthly';
@@ -52,7 +53,7 @@ interface ReportData {
 }
 
 // ─── Constants ──────────────────────────────────────
-const CHART_COLORS = ['#2563EB', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+const CHART_COLORS = ['#1F8034', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   observations: Eye, permits: ClipboardCheck, incidents: AlertTriangle,
@@ -68,9 +69,26 @@ const MODULE_LABELS: Record<string, string> = {
   moms: 'Weekly MOM', mockDrills: 'Mock Drills', campaigns: 'Campaigns', documents: 'Documents',
 };
 
+const MODULE_COLORS: Record<string, { badge: string; text: string }> = {
+  observations:   { badge: 'bg-primary-50 text-primary-600', text: 'text-primary-600' },
+  permits:        { badge: 'bg-info-50 text-info-600', text: 'text-info-600' },
+  incidents:      { badge: 'bg-danger-50 text-danger-600', text: 'text-danger-600' },
+  violations:     { badge: 'bg-warning-50 text-warning-600', text: 'text-warning-600' },
+  manpower:       { badge: 'bg-success-50 text-success-600', text: 'text-success-600' },
+  equipment:      { badge: 'bg-[#F5F3FF] text-[#8B5CF6]', text: 'text-[#8B5CF6]' },
+  training:       { badge: 'bg-[#ECFDF5] text-[#059669]', text: 'text-[#059669]' },
+  wasteManifests: { badge: 'bg-[#FFF7ED] text-[#EA580C]', text: 'text-[#EA580C]' },
+  mockups:        { badge: 'bg-[#EFF6FF] text-[#2563EB]', text: 'text-[#2563EB]' },
+  moms:           { badge: 'bg-[#FDF4FF] text-[#9333EA]', text: 'text-[#9333EA]' },
+  mockDrills:     { badge: 'bg-danger-50 text-danger-600', text: 'text-danger-600' },
+  campaigns:      { badge: 'bg-[#FFF1F2] text-[#E11D48]', text: 'text-[#E11D48]' },
+  documents:      { badge: 'bg-surface-sunken text-text-secondary', text: 'text-text-secondary' },
+};
+
 // ─── Component ──────────────────────────────────────
 export default function ReportsPage() {
   const { user, hasPermission } = useAuth();
+  const toast = useToast();
   const canExport = hasPermission('can_export_reports');
 
   // State
@@ -80,6 +98,7 @@ export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const [exportOpen, setExportOpen] = useState(false);
   const [copyMsg, setCopyMsg] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   // Close export dropdown on outside click
@@ -124,9 +143,9 @@ export default function ReportsPage() {
       { label: 'Permits', value: sm.permits.total },
       { label: 'Incidents', value: sm.incidents.total },
       { label: 'Violations', value: sm.violations.total },
-      { label: 'Manpower Records', value: sm.manpower.records },
-      { label: 'Total Headcount', value: sm.manpower.headcount },
-      { label: 'Total Man-Hours', value: sm.manpower.manhours },
+      { label: 'Manpower Records', value: sm.manpower.records || 0 },
+      { label: 'Total Headcount', value: sm.manpower.headcount || 0 },
+      { label: 'Total Man-Hours', value: sm.manpower.manhours || 0 },
       { label: 'Equipment', value: sm.equipment.total },
       { label: 'Training Records', value: sm.training.total },
       { label: 'Waste Manifests', value: sm.wasteManifests.total },
@@ -154,32 +173,96 @@ export default function ReportsPage() {
 
   const handleExport = async (fmt: string) => {
     if (!reportData) return;
+    if (isExporting) return;
+
+    // Empty data validation
+    if (reportData.records.total === 0 && !['print'].includes(fmt)) {
+      setCopyMsg('');
+      setExportOpen(false);
+      return;
+    }
+
     setExportOpen(false);
-    const data = buildExportData();
-    const name = filePrefix();
-    switch (fmt) {
-      case 'excel': exportExcel(data, name); break;
-      case 'csv':   exportCSV(data, name); break;
-      case 'pdf':   exportPDF(data, name); break;
-      case 'word':  await exportWord(data, name); break;
-      case 'json':  exportJSON({ period: reportData.period, summary: reportData.summary, contractorBreakdown: reportData.contractorBreakdown, records: reportData.records.data }, name); break;
-      case 'copy': {
-        const ok = await copyToClipboard(data);
-        setCopyMsg(ok ? 'Copied!' : 'Failed');
-        setTimeout(() => setCopyMsg(''), 2000);
-        break;
+    setIsExporting(true);
+
+    try {
+      // For file exports, fetch ALL records (not just current page of 25)
+      let exportRecords = reportData;
+      if (['excel', 'csv', 'pdf', 'word', 'pptx', 'json'].includes(fmt)) {
+        try {
+          exportRecords = await api.get<ReportData>(
+            `/reports/data?period=${period}&date=${selectedDate}&contractor=${encodeURIComponent(contractor)}&page=1&limit=10000`
+          );
+        } catch (err) {
+          // Fall back to current page data if full fetch fails
+          console.warn('Failed to fetch full export data, falling back to current page:', err);
+          exportRecords = reportData;
+        }
       }
-      case 'print': printReport(); break;
+
+      const data = (() => {
+        const d = exportRecords;
+        const sm = d.summary;
+        const meta: ReportMeta = {
+          title: `EHS·OS ${period.charAt(0).toUpperCase() + period.slice(1)} Report`,
+          period: d.period.label,
+          dateRange: `${d.period.start} to ${d.period.end}`,
+          generatedAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+          generatedBy: user?.name || user?.email || 'System',
+          filters: contractor ? `Contractor: ${contractor}` : undefined,
+        };
+        const summaryRows = [
+          { label: 'Observations', value: sm.observations.total },
+          { label: 'Permits', value: sm.permits.total },
+          { label: 'Incidents', value: sm.incidents.total },
+          { label: 'Violations', value: sm.violations.total },
+          { label: 'Manpower Records', value: sm.manpower.records || 0 },
+          { label: 'Total Headcount', value: sm.manpower.headcount || 0 },
+          { label: 'Total Man-Hours', value: sm.manpower.manhours || 0 },
+          { label: 'Equipment', value: sm.equipment.total },
+          { label: 'Training Records', value: sm.training.total },
+          { label: 'Waste Manifests', value: sm.wasteManifests.total },
+          { label: 'Mock-Ups', value: sm.mockups.total },
+          { label: 'Weekly MOM', value: sm.moms.total },
+          { label: 'Mock Drills', value: sm.mockDrills.total },
+          { label: 'Campaigns', value: sm.campaigns.total },
+          { label: 'Documents', value: sm.documents.total },
+        ];
+        const tableHeaders = ['Module', 'Record ID', 'Title', 'Status', 'Severity', 'Contractor', 'Area', 'Created'];
+        const tableRows = d.records.data.map(r => [
+          r.module, r.record_id, r.title || '', r.status || '', r.severity || '',
+          r.contractor || '', r.area || '',
+          r.created_at ? format(new Date(r.created_at), 'yyyy-MM-dd HH:mm') : '',
+        ]);
+        return { meta, summaryRows, tableHeaders, tableRows } as ExportData;
+      })();
+
+      const name = filePrefix();
+      switch (fmt) {
+        case 'excel': exportExcel(data, name); break;
+        case 'csv':   exportCSV(data, name); break;
+        case 'pdf':   exportPDF(data, name); break;
+        case 'word':  await exportWord(data, name); break;
+        case 'pptx':  await exportPowerPoint(data, name); break;
+        case 'json':  exportJSON({ period: exportRecords.period, summary: exportRecords.summary, contractorBreakdown: exportRecords.contractorBreakdown, records: exportRecords.records.data }, name); break;
+        case 'copy': {
+          const ok = await copyToClipboard(buildExportData());
+          setCopyMsg(ok ? 'Copied!' : 'Failed');
+          setTimeout(() => setCopyMsg(''), 2000);
+          break;
+        }
+        case 'print': printReport(); break;
+      }
+    } catch (err: any) {
+      console.error('Export failed:', err);
+      toast.error(err?.message || 'Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
   // ── Render ──
   const sm = reportData?.summary;
-  const grandTotal = sm
-    ? sm.observations.total + sm.permits.total + sm.incidents.total + sm.violations.total
-      + sm.manpower.records + sm.equipment.total + sm.training.total + sm.wasteManifests.total
-      + sm.mockups.total + sm.moms.total + sm.mockDrills.total + sm.campaigns.total + sm.documents.total
-    : 0;
 
   // Status breakdown for pie chart (merge all module breakdowns)
   const pieData = sm ? [
@@ -206,16 +289,18 @@ export default function ReportsPage() {
                 variant="primary"
                 icon={<Download size={16} />}
                 onClick={() => setExportOpen(!exportOpen)}
+                disabled={isExporting || !reportData}
               >
-                Export <ChevronDown size={14} />
+                {isExporting ? 'Exporting...' : 'Export'} <ChevronDown size={14} />
               </Button>
-              {exportOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-52 bg-surface border border-border rounded-[var(--radius-md)] shadow-lg z-50 py-1">
+              {exportOpen && !isExporting && (
+                <div className="absolute right-0 top-full mt-1.5 w-full sm:w-52 bg-surface border border-border rounded-[var(--radius-md)] shadow-lg z-50 py-1">
                   {[
                     { key: 'excel', icon: FileSpreadsheet, label: 'Excel (.xlsx)', color: 'text-success-600' },
                     { key: 'csv', icon: FileText, label: 'CSV (.csv)', color: 'text-info-600' },
                     { key: 'pdf', icon: FileType, label: 'PDF (.pdf)', color: 'text-danger-600' },
                     { key: 'word', icon: FileText, label: 'Word (.docx)', color: 'text-primary-700' },
+                    { key: 'pptx', icon: Presentation, label: 'PowerPoint (.pptx)', color: 'text-orange-600' },
                     { key: 'json', icon: FileJson, label: 'JSON (.json)', color: 'text-warning-600' },
                     { key: 'copy', icon: Copy, label: copyMsg || 'Copy Summary', color: 'text-[#8B5CF6]' },
                     { key: 'print', icon: Printer, label: 'Print View', color: 'text-text-secondary' },
@@ -265,7 +350,7 @@ export default function ReportsPage() {
         <select
           value={contractor}
           onChange={e => changeContractor(e.target.value)}
-          className="px-3 py-1.5 text-[13px] border border-border rounded-[var(--radius-sm)] bg-surface text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-150 max-w-[200px]"
+          className="px-3 py-1.5 text-[13px] border border-border rounded-[var(--radius-sm)] bg-surface text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-150 w-full sm:max-w-[200px]"
         >
           <option value="">All Contractors</option>
           {(contractors || []).map(c => <option key={c} value={c}>{c}</option>)}
@@ -291,20 +376,6 @@ export default function ReportsPage() {
 
       {reportData && sm && (
         <>
-          {/* ── Summary Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-            <SummaryCard icon={Eye} label="Observations" value={sm.observations.total} color="text-primary-600" bg="bg-primary-50" />
-            <SummaryCard icon={ClipboardCheck} label="Permits" value={sm.permits.total} color="text-info-600" bg="bg-info-50" />
-            <SummaryCard icon={AlertTriangle} label="Incidents" value={sm.incidents.total} color="text-danger-600" bg="bg-danger-50" />
-            <SummaryCard icon={Ban} label="Violations" value={sm.violations.total} color="text-warning-600" bg="bg-warning-50" />
-            <SummaryCard icon={Users} label="Man-Hours" value={Number(sm.manpower.manhours).toLocaleString()} color="text-success-600" bg="bg-success-50" />
-            <SummaryCard icon={Users} label="Headcount" value={sm.manpower.headcount} color="text-success-600" bg="bg-success-50" />
-            <SummaryCard icon={Wrench} label="Equipment" value={sm.equipment.total} color="text-[#8B5CF6]" bg="bg-[#F5F3FF]" />
-            <SummaryCard icon={GraduationCap} label="Training" value={sm.training.total} color="text-primary-600" bg="bg-primary-50" />
-            <SummaryCard icon={Truck} label="Waste Manifests" value={sm.wasteManifests.total} color="text-warning-600" bg="bg-warning-50" />
-            <SummaryCard icon={BarChart3} label="Total Records" value={grandTotal} color="text-text-primary" bg="bg-surface-sunken" />
-          </div>
-
           {/* ── Charts Row ── */}
           {reportData.trend.length > 1 && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 print:grid-cols-2">
@@ -316,7 +387,7 @@ export default function ReportsPage() {
                     <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-text-tertiary)' }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="observations" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} name="Observations" />
+                    <Line type="monotone" dataKey="observations" stroke="#1F8034" strokeWidth={2} dot={{ r: 3 }} name="Observations" />
                     <Line type="monotone" dataKey="permits" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Permits" />
                     <Line type="monotone" dataKey="incidents" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} name="Incidents" />
                   </LineChart>
@@ -347,14 +418,17 @@ export default function ReportsPage() {
                 if (!mod) return null;
                 const total = mod.total ?? mod.records ?? 0;
                 const Icon = MODULE_ICONS[key] || BarChart3;
+                const colors = MODULE_COLORS[key] || { badge: 'bg-surface-sunken text-text-tertiary', text: 'text-text-tertiary' };
                 const breakdown: BreakdownItem[] = mod.breakdown || [];
                 return (
-                  <div key={key} className="bg-surface rounded-[var(--radius-lg)] border border-border p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon size={16} className="text-text-tertiary" />
-                      <span className="text-[13px] font-medium text-text-primary">{label}</span>
-                      <span className="ml-auto text-[20px] font-bold text-text-primary">{total}</span>
+                  <div key={key} className="bg-surface rounded-[var(--radius-lg)] border border-border p-4 shadow-xs hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`p-2 rounded-[var(--radius-md)] ${colors.badge}`}>
+                        <Icon size={16} />
+                      </div>
+                      <span className={`text-[22px] font-bold ${colors.text}`}>{total}</span>
                     </div>
+                    <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">{label}</p>
                     {breakdown.length > 0 && (
                       <div className="space-y-1">
                         {breakdown.slice(0, 5).map(b => (
@@ -369,11 +443,11 @@ export default function ReportsPage() {
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] text-text-tertiary">
                           <span>Headcount</span>
-                          <span className="font-medium text-text-secondary">{sm.manpower.headcount}</span>
+                          <span className="font-medium text-text-secondary">{sm.manpower.headcount || 0}</span>
                         </div>
                         <div className="flex justify-between text-[11px] text-text-tertiary">
                           <span>Man-Hours</span>
-                          <span className="font-medium text-text-secondary">{Number(sm.manpower.manhours).toLocaleString()}</span>
+                          <span className="font-medium text-text-secondary">{Number(sm.manpower.manhours || 0).toLocaleString()}</span>
                         </div>
                       </div>
                     )}
@@ -501,18 +575,6 @@ export default function ReportsPage() {
 }
 
 // ─── Sub-components ─────────────────────────────────
-function SummaryCard({ icon: Icon, label, value, color, bg }: { icon: LucideIcon; label: string; value: string | number; color: string; bg: string }) {
-  return (
-    <div className={`${bg} rounded-[var(--radius-lg)] border border-border p-3 sm:p-4`}>
-      <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-        <Icon size={14} className={`${color} shrink-0`} />
-        <span className="text-[10px] sm:text-[11px] text-text-secondary truncate">{label}</span>
-      </div>
-      <p className={`text-[16px] sm:text-[20px] font-bold ${color}`}>{value}</p>
-    </div>
-  );
-}
-
 function SeverityBadge({ severity }: { severity: string }) {
   const variantMap: Record<string, 'danger' | 'warning' | 'success' | 'neutral'> = {
     Critical: 'danger', Major: 'warning', Minor: 'warning',

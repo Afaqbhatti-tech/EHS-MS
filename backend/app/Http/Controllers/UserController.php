@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class UserController extends Controller
@@ -26,18 +27,18 @@ class UserController extends Controller
             'id' => $u->id,
             'email' => $u->email,
             'username' => $u->username,
-            'fullName' => $u->full_name,
+            'name' => $u->full_name,
             'role' => $u->role,
             'contractor' => $u->contractor,
             'permissions' => $u->permissions ?? [],
             'isActive' => $u->is_active,
-            'hasPassword' => !empty($u->password_hash),
+            'passwordSet' => !empty($u->password_hash),
             'lastLoginAt' => $u->last_login_at?->toISOString(),
             'createdAt' => $u->created_at?->toISOString(),
             'updatedAt' => $u->updated_at?->toISOString(),
         ]);
 
-        return response()->json($formatted);
+        return response()->json(['users' => $formatted]);
     }
 
     /**
@@ -55,7 +56,7 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'fullName' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'role' => 'required|string',
             'contractor' => 'nullable|string|max:100',
@@ -77,7 +78,7 @@ class UserController extends Controller
         $user = User::create([
             'id' => $id,
             'email' => $request->input('email'),
-            'full_name' => $request->input('fullName'),
+            'full_name' => $request->input('name'),
             'role' => $request->input('role'),
             'contractor' => $request->input('contractor'),
             'permissions' => $permissions,
@@ -113,8 +114,8 @@ class UserController extends Controller
 
         $data = [];
 
-        if ($request->has('fullName')) {
-            $data['full_name'] = $request->input('fullName');
+        if ($request->has('name')) {
+            $data['full_name'] = $request->input('name');
         }
         if ($request->has('contractor')) {
             $data['contractor'] = $request->input('contractor');
@@ -150,6 +151,40 @@ class UserController extends Controller
             'createdAt' => $user->created_at?->toISOString(),
             'updatedAt' => $user->updated_at?->toISOString(),
         ]);
+    }
+
+    /**
+     * PUT /api/users/{id}/reset-password  (admin resets a user's password)
+     */
+    public function resetPassword(Request $request, string $id): JsonResponse
+    {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $request->validate([
+            'new_password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/[A-Z]/',
+                'regex:/[a-z]/',
+                'regex:/[0-9]/',
+                'regex:/[^A-Za-z0-9]/',
+            ],
+            'new_password_confirmation' => 'required|same:new_password',
+        ], [
+            'new_password.regex' => 'Password must contain uppercase, lowercase, number, and special character.',
+        ]);
+
+        $user->update([
+            'password_hash' => Hash::make($request->input('new_password')),
+            'setup_token' => null,
+            'setup_token_expires_at' => null,
+        ]);
+
+        return response()->json(['message' => 'Password has been reset successfully']);
     }
 
     /**

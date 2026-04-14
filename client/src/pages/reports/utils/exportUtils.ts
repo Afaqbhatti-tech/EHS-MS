@@ -165,6 +165,66 @@ export async function exportWord(data: ExportData, filename: string) {
   saveAs(buffer, `${filename}.docx`);
 }
 
+// ─── PowerPoint (.pptx) ─────────────────────────────
+export async function exportPowerPoint(data: ExportData, filename: string) {
+  const pptxgenjs = await import('pptxgenjs');
+  const PptxGenJS = pptxgenjs.default;
+  const pptx = new PptxGenJS();
+
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = data.meta.generatedBy;
+  pptx.title = data.meta.title;
+
+  // ─ Title slide
+  const titleSlide = pptx.addSlide();
+  titleSlide.addText(data.meta.title, { x: 0.8, y: 1.2, w: 11, h: 1.2, fontSize: 28, bold: true, color: '1E40AF' });
+  titleSlide.addText(
+    `Period: ${data.meta.period}  |  Date Range: ${data.meta.dateRange}\nGenerated: ${data.meta.generatedAt}  |  By: ${data.meta.generatedBy}${data.meta.filters ? `\nFilters: ${data.meta.filters}` : ''}`,
+    { x: 0.8, y: 2.5, w: 11, h: 1.2, fontSize: 12, color: '64748B' }
+  );
+
+  // ─ Summary slide
+  const summarySlide = pptx.addSlide();
+  summarySlide.addText('Summary', { x: 0.5, y: 0.3, w: 12, h: 0.6, fontSize: 22, bold: true, color: '1E40AF' });
+
+  const summaryHeader = [{ text: 'Metric', options: { bold: true, fill: { color: '1E40AF' }, color: 'FFFFFF', fontSize: 11 } }, { text: 'Value', options: { bold: true, fill: { color: '1E40AF' }, color: 'FFFFFF', fontSize: 11 } }];
+  const summaryBody = data.summaryRows.map(r => [
+    { text: r.label, options: { fontSize: 10 } },
+    { text: String(r.value), options: { fontSize: 10, bold: true } },
+  ]);
+
+  summarySlide.addTable([summaryHeader, ...summaryBody] as any, {
+    x: 0.5, y: 1.1, w: 8, colW: [5, 3],
+    border: { type: 'solid', pt: 0.5, color: 'CBD5E1' },
+    rowH: 0.4,
+  });
+
+  // ─ Data slides (paginate rows into chunks of 12)
+  const ROWS_PER_SLIDE = 12;
+  const totalPages = Math.ceil(data.tableRows.length / ROWS_PER_SLIDE);
+
+  for (let p = 0; p < Math.max(totalPages, 1); p++) {
+    const dataSlide = pptx.addSlide();
+    dataSlide.addText(`Detailed Records${totalPages > 1 ? ` (${p + 1}/${totalPages})` : ''}`, { x: 0.5, y: 0.3, w: 12, h: 0.5, fontSize: 18, bold: true, color: '1E40AF' });
+
+    const headerRow = data.tableHeaders.map(h => ({ text: h, options: { bold: true, fill: { color: '1E40AF' }, color: 'FFFFFF', fontSize: 8 } }));
+    const pageRows = data.tableRows.slice(p * ROWS_PER_SLIDE, (p + 1) * ROWS_PER_SLIDE);
+    const bodyRows = pageRows.map(row => row.map(cell => ({ text: String(cell ?? ''), options: { fontSize: 8 } })));
+
+    const colCount = data.tableHeaders.length;
+    const colW = colCount > 0 ? Array(colCount).fill(12 / colCount) : [12];
+
+    dataSlide.addTable([headerRow, ...bodyRows] as any, {
+      x: 0.5, y: 1.0, w: 12, colW,
+      border: { type: 'solid', pt: 0.5, color: 'CBD5E1' },
+      rowH: 0.35,
+      autoPage: false,
+    });
+  }
+
+  await pptx.writeFile({ fileName: `${filename}.pptx` });
+}
+
 // ─── JSON ───────────────────────────────────────────
 export function exportJSON(data: any, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

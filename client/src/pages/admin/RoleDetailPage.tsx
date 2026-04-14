@@ -1,449 +1,612 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Save, Users, UserCog, Shield, Lock } from 'lucide-react';
-import { PERMISSION_GROUPS, formatPermLabel } from '../../constants/permissions';
-import Button from '../../components/ui/Button';
+import { api } from '../../services/api';
 import Badge from '../../components/ui/Badge';
-import Modal from '../../components/ui/Modal';
-import { PageSpinner } from '../../components/ui/Spinner';
+import { useToast } from '../../components/ui/Toast';
+import {
+  ArrowLeft, Save, Shield, Lock, Search,
+  ChevronDown, ChevronRight, ToggleLeft, ToggleRight,
+  Check, X, Eye, Zap, Settings, Database,
+  LayoutDashboard, Brain, ClipboardCheck, Users, CheckSquare, Package,
+  FolderKanban, ClipboardList, FileText, GraduationCap, Wrench, Ban,
+  AlertTriangle, Siren, CalendarDays, FileEdit, Upload, FolderOpen,
+  Megaphone, Image, Leaf, Truck, HardHat, BarChart3,
+  type LucideIcon,
+} from 'lucide-react';
+import {
+  type RegistryModule,
+  type RegistryPermission,
+  PERMISSION_TYPE_LABELS,
+} from '../../constants/permissions';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// ─── Icon Map ────────────────────────────────────
 
-interface RoleUser {
-  id: string;
-  name: string;
-  email: string;
-  username: string | null;
-  isActive: boolean;
-  hasOverrides: boolean;
-}
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutDashboard, Brain, Eye, ClipboardCheck, Users, CheckSquare, Package,
+  FolderKanban, ClipboardList, FileText, GraduationCap, Wrench, Ban,
+  AlertTriangle, Siren, CalendarDays, FileEdit, Upload, FolderOpen,
+  Megaphone, Image, Leaf, Truck, HardHat, BarChart3, Shield, Settings,
+  Database,
+};
 
-interface RoleMetadata {
-  id: string;
+// ─── Type Badge Styles ───────────────────────────
+
+const TYPE_STYLES: Record<string, string> = {
+  module:  'bg-blue-50 text-blue-700',
+  section: 'bg-purple-50 text-purple-700',
+  data:    'bg-emerald-50 text-emerald-700',
+  action:  'bg-amber-50 text-amber-700',
+};
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  module:  Shield,
+  section: Eye,
+  data:    Database,
+  action:  Zap,
+};
+
+// ─── Interfaces ──────────────────────────────────
+
+interface RoleSummary {
   slug: string;
   name: string;
   description: string;
   isSystem: boolean;
-  isActive: boolean;
+  grantedCount: number;
+  totalPermissions: number;
+  userCount: number;
 }
+
+// ─── Toggle Switch Component ─────────────────────
+
+function Toggle({
+  enabled,
+  disabled,
+  onChange,
+  size = 'md',
+}: {
+  enabled: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  size?: 'sm' | 'md';
+}) {
+  const w = size === 'sm' ? 'w-[34px]' : 'w-[40px]';
+  const h = size === 'sm' ? 'h-[18px]' : 'h-[22px]';
+  const dot = size === 'sm' ? 'w-[14px] h-[14px]' : 'w-[18px] h-[18px]';
+  const translate = size === 'sm'
+    ? (enabled ? 'translate-x-[16px]' : 'translate-x-[2px]')
+    : (enabled ? 'translate-x-[18px]' : 'translate-x-[2px]');
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      disabled={disabled}
+      onClick={onChange}
+      className={`
+        ${w} ${h} rounded-full relative inline-flex items-center shrink-0 transition-all duration-200
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${enabled ? 'bg-green-500' : 'bg-gray-300'}
+      `}
+    >
+      <span
+        className={`
+          ${dot} rounded-full bg-white shadow-sm transition-transform duration-200
+          ${translate}
+        `}
+      />
+    </button>
+  );
+}
+
+// ─── Main Component ──────────────────────────────
 
 export default function RoleDetailPage() {
   const { role } = useParams<{ role: string }>();
-  const { token } = useAuth();
   const navigate = useNavigate();
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
+  const toast = useToast();
 
-  const [roleMeta, setRoleMeta] = useState<RoleMetadata | null>(null);
+  // Data state
+  const [roleMeta, setRoleMeta] = useState<RoleSummary | null>(null);
+  const [registry, setRegistry] = useState<RegistryModule[]>([]);
+  const [allKeys, setAllKeys] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [originalPerms, setOriginalPerms] = useState<Record<string, boolean>>({});
-  const [users, setUsers] = useState<RoleUser[]>([]);
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  // User override modal state
-  const [overrideUser, setOverrideUser] = useState<RoleUser | null>(null);
-  const [overrideData, setOverrideData] = useState<{
-    roleDefaults: Record<string, boolean>;
-    overrides: Record<string, boolean>;
-    effective: Record<string, boolean>;
-  } | null>(null);
-  const [overrideLoading, setOverrideLoading] = useState(false);
-  const [overrideSaving, setOverrideSaving] = useState(false);
-  const [localOverrides, setLocalOverrides] = useState<Record<string, boolean | null>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   const isMaster = role === 'master';
-  const roleLabel = roleMeta?.name || role || '';
+
+  // ─── Data Fetching ───────────────────────────────
 
   useEffect(() => {
     if (!role) return;
     setLoading(true);
 
     Promise.all([
-      fetch(`${API_BASE}/roles`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/roles/${role}/permissions`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/roles/${role}/users`, { headers }).then(r => r.json()),
+      api.get<{ roles: RoleSummary[] }>('/roles'),
+      api.get<{ registry: RegistryModule[]; allKeys: string[] }>('/roles/permissions/registry'),
+      api.get<{ permissions: Record<string, boolean> }>(`/roles/${role}/permissions`),
     ])
-      .then(([rolesData, permData, userData]) => {
-        const meta = (rolesData.roles || []).find((r: any) => r.slug === role || r.role === role);
-        if (meta) {
-          setRoleMeta({
-            id: meta.id,
-            slug: meta.slug || meta.role,
-            name: meta.name || meta.label,
-            description: meta.description || '',
-            isSystem: !!meta.isSystem,
-            isActive: meta.isActive !== false,
-          });
-        }
+      .then(([rolesData, registryData, permData]) => {
+        const meta = (rolesData.roles || []).find(
+          (r) => r.slug === role
+        );
+        if (meta) setRoleMeta(meta);
+
+        setRegistry(registryData.registry || []);
+        setAllKeys(registryData.allKeys || []);
         setPermissions(permData.permissions || {});
         setOriginalPerms(permData.permissions || {});
-        setUsers(userData.users || []);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [role, token]);
 
-  const hasChanges = JSON.stringify(permissions) !== JSON.stringify(originalPerms);
+        // Auto-expand first module
+        if (registryData.registry?.length) {
+          setExpandedModules(new Set([registryData.registry[0].key]));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load role data:', err);
+        toast.error('Failed to load role data');
+      })
+      .finally(() => setLoading(false));
+  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Computed Values ─────────────────────────────
+
+  const hasChanges = useMemo(
+    () => JSON.stringify(permissions) !== JSON.stringify(originalPerms),
+    [permissions, originalPerms]
+  );
+
+  const grantedCount = useMemo(
+    () => Object.values(permissions).filter(Boolean).length,
+    [permissions]
+  );
+
+  const totalCount = allKeys.length || Object.keys(permissions).length;
+
+  const progressPercent = totalCount > 0 ? Math.round((grantedCount / totalCount) * 100) : 0;
+
+  // ─── Search / Filter ─────────────────────────────
+
+  const filteredRegistry = useMemo(() => {
+    if (!searchTerm.trim()) return registry;
+
+    const q = searchTerm.toLowerCase();
+    return registry
+      .map((mod) => {
+        const moduleMatches = mod.label.toLowerCase().includes(q) ||
+          mod.key.toLowerCase().includes(q);
+
+        if (moduleMatches) return mod;
+
+        const matchingPerms = mod.permissions.filter(
+          (p) =>
+            p.label.toLowerCase().includes(q) ||
+            p.key.toLowerCase().includes(q)
+        );
+
+        if (matchingPerms.length === 0) return null;
+
+        return { ...mod, permissions: matchingPerms };
+      })
+      .filter(Boolean) as RegistryModule[];
+  }, [registry, searchTerm]);
+
+  // When searching, expand all matching modules
+  const effectiveExpanded = useMemo(() => {
+    if (searchTerm.trim()) {
+      return new Set(filteredRegistry.map((m) => m.key));
+    }
+    return expandedModules;
+  }, [searchTerm, filteredRegistry, expandedModules]);
+
+  // ─── Actions ─────────────────────────────────────
+
+  const togglePerm = (key: string) => {
+    if (isMaster) return;
+    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleModule = (moduleKey: string) => {
+    setExpandedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleKey)) {
+        next.delete(moduleKey);
+      } else {
+        next.add(moduleKey);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllInModule = (mod: RegistryModule) => {
+    if (isMaster) return;
+    const modulePermKeys = mod.permissions.map((p) => p.key);
+    const allEnabled = modulePermKeys.every((k) => permissions[k]);
+
+    setPermissions((prev) => {
+      const next = { ...prev };
+      modulePermKeys.forEach((k) => {
+        next[k] = !allEnabled;
+      });
+      return next;
+    });
+  };
+
+  const enableAll = () => {
+    if (isMaster) return;
+    setPermissions((prev) => {
+      const next = { ...prev };
+      allKeys.forEach((k) => {
+        next[k] = true;
+      });
+      return next;
+    });
+  };
+
+  const disableAll = () => {
+    if (isMaster) return;
+    setPermissions((prev) => {
+      const next = { ...prev };
+      allKeys.forEach((k) => {
+        next[k] = false;
+      });
+      return next;
+    });
+  };
 
   const handleSave = async () => {
     if (!role || isMaster) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/roles/${role}/permissions`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ permissions }),
-      });
-      if (res.ok) {
-        setOriginalPerms({ ...permissions });
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        const userData = await fetch(`${API_BASE}/roles/${role}/users`, { headers }).then(r => r.json());
-        setUsers(userData.users || []);
-      }
-    } catch (err) {
+      const result = await api.put<{ message: string; permissions: Record<string, boolean> }>(
+        `/roles/${role}/permissions`,
+        { permissions }
+      );
+      setOriginalPerms(result.permissions || { ...permissions });
+      setPermissions(result.permissions || { ...permissions });
+      toast.success('Permissions saved successfully');
+    } catch (err: any) {
       console.error('Save error:', err);
+      toast.error(err?.message || 'Failed to save permissions');
     } finally {
       setSaving(false);
     }
   };
 
-  const togglePerm = (key: string) => {
-    setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  // ─── Helpers ─────────────────────────────────────
 
-  const grantedCount = Object.values(permissions).filter(Boolean).length;
-  const totalCount = Object.keys(permissions).length;
-
-  // ─── User Override Modal ────────────────────────
-  const openOverrideModal = async (user: RoleUser) => {
-    setOverrideUser(user);
-    setOverrideLoading(true);
-    setOverrideData(null);
-    setLocalOverrides({});
-
-    try {
-      const res = await fetch(`${API_BASE}/roles/user-overrides/${user.id}`, { headers });
-      const data = await res.json();
-      setOverrideData({
-        roleDefaults: data.roleDefaults || {},
-        overrides: data.overrides || {},
-        effective: data.effective || {},
-      });
-      setLocalOverrides(data.overrides || {});
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setOverrideLoading(false);
-    }
-  };
-
-  const cycleOverride = (perm: string) => {
-    if (!overrideData) return;
-    const roleDefault = !!overrideData.roleDefaults[perm];
-    const currentOverride = localOverrides[perm];
-
-    if (currentOverride === undefined || currentOverride === null) {
-      setLocalOverrides(prev => ({ ...prev, [perm]: !roleDefault }));
-    } else if (currentOverride !== roleDefault) {
-      const copy = { ...localOverrides };
-      delete copy[perm];
-      setLocalOverrides(copy);
-    } else {
-      const copy = { ...localOverrides };
-      delete copy[perm];
-      setLocalOverrides(copy);
-    }
-  };
-
-  const saveOverrides = async () => {
-    if (!overrideUser) return;
-    setOverrideSaving(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/roles/user-overrides/${overrideUser.id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ overrides: localOverrides }),
-      });
-      if (res.ok) {
-        setOverrideUser(null);
-        const userData = await fetch(`${API_BASE}/roles/${role}/users`, { headers }).then(r => r.json());
-        setUsers(userData.users || []);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setOverrideSaving(false);
-    }
-  };
-
-  if (loading) {
-    return <PageSpinner label="Loading role..." />;
+  function getModuleStats(mod: RegistryModule): { enabled: number; total: number } {
+    const total = mod.permissions.length;
+    const enabled = mod.permissions.filter((p) => isMaster || permissions[p.key]).length;
+    return { enabled, total };
   }
 
+  function groupPermissionsByType(perms: RegistryPermission[]): Record<string, RegistryPermission[]> {
+    const groups: Record<string, RegistryPermission[]> = {};
+    const order = ['module', 'section', 'data', 'action'];
+
+    order.forEach((type) => {
+      const matched = perms.filter((p) => p.type === type);
+      if (matched.length > 0) {
+        groups[type] = matched;
+      }
+    });
+
+    return groups;
+  }
+
+  // ─── Loading State ───────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Loading role permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render ──────────────────────────────────────
+
   return (
-    <div className="max-w-[1024px]">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 sm:pb-6 mb-4 sm:mb-6 border-b border-border">
-        <button onClick={() => navigate('/admin/roles')} className="p-2 hover:bg-surface-sunken rounded-[var(--radius-sm)] transition-colors duration-150 self-start">
-          <ArrowLeft size={18} className="text-text-secondary" />
+    <div className="max-w-[960px] mx-auto pb-24">
+      {/* ── Header ──────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
+        <button
+          onClick={() => navigate('/admin/roles')}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors self-start shrink-0"
+        >
+          <ArrowLeft size={18} className="text-gray-500" />
         </button>
+
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-[20px] sm:text-[24px] leading-[28px] sm:leading-[32px] font-bold text-text-primary tracking-tight">{roleLabel}</h1>
-            {isMaster && (
-              <Badge variant="warning">FULL ACCESS — All permissions always granted</Badge>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+              {roleMeta?.name || role}
+            </h1>
+            {roleMeta?.userCount !== undefined && (
+              <Badge variant="info">
+                {roleMeta.userCount} {roleMeta.userCount === 1 ? 'user' : 'users'}
+              </Badge>
             )}
-            {roleMeta?.isSystem && !isMaster && (
-              <span className="text-[10px] bg-surface-sunken text-text-tertiary px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                <Lock size={10} /> SYSTEM ROLE
+            {roleMeta?.isSystem && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+                <Lock size={10} /> SYSTEM
               </span>
-            )}
-            {roleMeta && !roleMeta.isSystem && (
-              <Badge variant="primary">CUSTOM ROLE</Badge>
             )}
           </div>
           {roleMeta?.description && (
-            <p className="text-[11px] text-text-tertiary mt-0.5">{roleMeta.description}</p>
+            <p className="text-[13px] text-gray-500 mt-1">{roleMeta.description}</p>
           )}
-          <p className="text-[13px] text-text-secondary mt-0.5">
-            {grantedCount}/{totalCount} permissions granted
-            <span className="text-text-disabled font-mono text-[11px] ml-2">({role})</span>
-          </p>
         </div>
-
-        {!isMaster && (
-          <Button
-            variant={hasChanges ? 'primary' : saved ? 'secondary' : 'secondary'}
-            icon={<Save size={16} />}
-            disabled={!hasChanges && !saved}
-            loading={saving}
-            onClick={handleSave}
-            className={saved ? 'bg-success-50 text-success-700 border-success-200' : ''}
-          >
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
-          </Button>
-        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Permissions Panel */}
-        <div className="lg:col-span-2 space-y-4">
-          {PERMISSION_GROUPS.map(group => {
-            const groupPerms = group.perms.filter(p => p in permissions);
-            if (!groupPerms.length) return null;
-
-            return (
-              <div key={group.label} className="bg-surface rounded-[var(--radius-lg)] border border-border overflow-hidden">
-                <div className="px-4 py-3 bg-surface-sunken border-b border-border">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                    {group.label}
-                  </h3>
-                </div>
-                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {groupPerms.map(perm => (
-                    <label
-                      key={perm}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-[var(--radius-sm)] cursor-pointer transition-colors duration-150 ${
-                        isMaster
-                          ? 'bg-success-50 cursor-default'
-                          : permissions[perm]
-                            ? 'bg-primary-50 hover:bg-primary-100'
-                            : 'bg-surface-sunken hover:bg-[#E8EBF0]'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isMaster || !!permissions[perm]}
-                        onChange={() => togglePerm(perm)}
-                        disabled={isMaster}
-                        className="rounded border-border-strong text-primary-600 focus:ring-primary-500 w-4 h-4"
-                      />
-                      <span className={`text-[13px] ${permissions[perm] || isMaster ? 'text-text-primary' : 'text-text-tertiary'}`}>
-                        {formatPermLabel(perm)}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {/* ── Master Role Banner ──────────────────────── */}
+      {isMaster && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <Shield size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Full Access Role</p>
+            <p className="text-[13px] text-amber-700 mt-0.5">
+              Master role has full access to all permissions. This cannot be modified.
+            </p>
+          </div>
         </div>
+      )}
 
-        {/* Users Panel */}
-        <div className="space-y-4">
-          {/* Role Info Card */}
-          {roleMeta && (
-            <div className="bg-surface rounded-[var(--radius-lg)] border border-border">
-              <div className="px-4 py-3 bg-surface-sunken border-b border-border flex items-center gap-2">
-                <Shield size={14} className="text-text-tertiary" />
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Role Info
-                </h3>
-              </div>
-              <div className="p-4 space-y-2 text-[13px]">
-                <div>
-                  <span className="text-text-tertiary">Name:</span>
-                  <span className="ml-2 text-text-primary font-medium">{roleMeta.name}</span>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Slug:</span>
-                  <span className="ml-2 text-text-primary font-mono text-[11px]">{roleMeta.slug}</span>
-                </div>
-                {roleMeta.description && (
-                  <div>
-                    <span className="text-text-tertiary">Description:</span>
-                    <p className="text-text-secondary mt-0.5 text-[11px]">{roleMeta.description}</p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-text-tertiary">Type:</span>
-                  <span className="ml-2">
-                    <Badge variant={roleMeta.isSystem ? 'neutral' : 'primary'}>
-                      {roleMeta.isSystem ? 'System Role' : 'Custom Role'}
-                    </Badge>
-                  </span>
-                </div>
-              </div>
+      {/* ── Search Bar ──────────────────────────────── */}
+      <div className="mb-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search permissions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X size={14} className="text-gray-400" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Summary Bar ─────────────────────────────── */}
+      <div className="mb-6 p-4 bg-white rounded-xl border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {isMaster ? totalCount : grantedCount} of {totalCount} permissions enabled
+              </span>
+              <span className="text-xs text-gray-400">
+                ({isMaster ? 100 : progressPercent}%)
+              </span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                style={{ width: `${isMaster ? 100 : progressPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {!isMaster && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={enableAll}
+                className="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+              >
+                Enable All
+              </button>
+              <button
+                onClick={disableAll}
+                className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                Disable All
+              </button>
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Users List */}
-          <div className="bg-surface rounded-[var(--radius-lg)] border border-border">
-            <div className="px-4 py-3 bg-surface-sunken border-b border-border flex items-center gap-2">
-              <Users size={14} className="text-text-tertiary" />
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                Users with this role ({users.length})
-              </h3>
-            </div>
-            <div className="divide-y divide-border">
-              {users.length === 0 ? (
-                <div className="p-4 text-[13px] text-text-tertiary text-center">No users with this role</div>
-              ) : (
-                users.map(u => (
-                  <div key={u.id} className="px-4 py-3 flex items-center justify-between">
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-text-primary truncate">{u.name}</p>
-                      <p className="text-[11px] text-text-tertiary truncate">{u.email}</p>
-                      {u.hasOverrides && (
-                        <Badge variant="warning" className="mt-0.5">Custom overrides</Badge>
-                      )}
-                    </div>
-                    {!isMaster && (
-                      <button
-                        onClick={() => openOverrideModal(u)}
-                        className="shrink-0 p-1.5 rounded-[var(--radius-sm)] hover:bg-surface-sunken text-text-tertiary hover:text-primary-600 transition-colors duration-150"
-                        title="Manage individual permissions"
-                      >
-                        <UserCog size={16} />
-                      </button>
-                    )}
+      {/* ── Permission Tree ─────────────────────────── */}
+      <div className="space-y-3">
+        {filteredRegistry.length === 0 && (
+          <div className="py-12 text-center">
+            <Search size={32} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-sm text-gray-500">No permissions match your search.</p>
+          </div>
+        )}
+
+        {filteredRegistry.map((mod) => {
+          const isExpanded = effectiveExpanded.has(mod.key);
+          const stats = getModuleStats(mod);
+          const Icon = ICON_MAP[mod.icon] || Settings;
+          const allInModuleEnabled = mod.permissions.every(
+            (p) => isMaster || permissions[p.key]
+          );
+          const someInModuleEnabled = mod.permissions.some(
+            (p) => isMaster || permissions[p.key]
+          );
+          const grouped = groupPermissionsByType(mod.permissions);
+
+          return (
+            <div
+              key={mod.key}
+              className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+            >
+              {/* Module Header */}
+              <div
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors select-none"
+                onClick={() => toggleModule(mod.key)}
+              >
+                {/* Expand/Collapse Icon */}
+                <span className="text-gray-400 shrink-0">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </span>
+
+                {/* Module Icon */}
+                <span className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                  <Icon size={16} className="text-indigo-600" />
+                </span>
+
+                {/* Module Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-900">{mod.label}</span>
+                    <span className="text-[11px] text-gray-400">
+                      {stats.enabled}/{stats.total}
+                    </span>
                   </div>
-                ))
+                  {mod.description && (
+                    <p className="text-[12px] text-gray-400 truncate">{mod.description}</p>
+                  )}
+                </div>
+
+                {/* Module-level toggle all */}
+                <div
+                  className="shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAllInModule(mod);
+                  }}
+                >
+                  <Toggle
+                    enabled={allInModuleEnabled}
+                    disabled={isMaster}
+                    onChange={() => toggleAllInModule(mod)}
+                    size="sm"
+                  />
+                </div>
+              </div>
+
+              {/* Module Content (Expanded) */}
+              {isExpanded && (
+                <div className="border-t border-gray-100 px-4 py-3">
+                  {Object.entries(grouped).map(([type, perms]) => {
+                    const TypeIcon = TYPE_ICONS[type] || Settings;
+
+                    return (
+                      <div key={type} className="mb-4 last:mb-0">
+                        {/* Type Group Header */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <TypeIcon size={13} className="text-gray-400" />
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                            {PERMISSION_TYPE_LABELS[type] || type}
+                          </span>
+                        </div>
+
+                        {/* Permission Rows */}
+                        <div className="space-y-0.5">
+                          {perms.map((perm) => {
+                            const isEnabled = isMaster || !!permissions[perm.key];
+                            const isHighlighted =
+                              searchTerm.trim() &&
+                              (perm.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                perm.key.toLowerCase().includes(searchTerm.toLowerCase()));
+
+                            return (
+                              <div
+                                key={perm.key}
+                                className={`
+                                  flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-colors
+                                  ${isHighlighted ? 'bg-yellow-50 ring-1 ring-yellow-200' : 'hover:bg-gray-50'}
+                                  ${type === 'module' ? 'bg-blue-50/40' : ''}
+                                `}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span
+                                    className={`text-[13px] ${
+                                      isEnabled ? 'text-gray-900' : 'text-gray-400'
+                                    }`}
+                                  >
+                                    {perm.label}
+                                  </span>
+                                  <span
+                                    className={`
+                                      inline-flex items-center px-1.5 py-[1px] rounded text-[10px] font-medium shrink-0
+                                      ${TYPE_STYLES[perm.type] || 'bg-gray-50 text-gray-600'}
+                                    `}
+                                  >
+                                    {perm.type}
+                                  </span>
+                                </div>
+
+                                <Toggle
+                                  enabled={isEnabled}
+                                  disabled={isMaster}
+                                  onChange={() => togglePerm(perm.key)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* ─── User Override Modal ──────────────────────── */}
-      <Modal
-        open={!!overrideUser}
-        onClose={() => setOverrideUser(null)}
-        title="Permission Overrides"
-        subtitle={overrideUser ? `${overrideUser.name} — ${roleLabel}` : ''}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setOverrideUser(null)}>Cancel</Button>
-            <Button variant="primary" loading={overrideSaving} onClick={saveOverrides}>
-              Save Overrides
-            </Button>
-          </>
-        }
-      >
-        {overrideLoading ? (
-          <PageSpinner label="Loading permissions..." />
-        ) : overrideData ? (
-          <div>
-            <div className="mb-4 p-3 bg-info-50 border border-info-100 rounded-[var(--radius-md)] text-[13px] text-info-600">
-              Click a permission to toggle between: <strong>Inherit from role</strong> (gray),
-              <strong className="text-success-700"> Granted</strong> (green), or
-              <strong className="text-danger-700"> Denied</strong> (red).
+      {/* ── Sticky Save Bar ─────────────────────────── */}
+      {hasChanges && !isMaster && (
+        <div className="fixed bottom-0 left-0 right-0 z-30">
+          <div className="max-w-[960px] mx-auto px-4 pb-4">
+            <div className="flex items-center justify-between gap-4 px-5 py-3 bg-white rounded-xl border border-gray-200 shadow-lg">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>You have unsaved changes</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setPermissions({ ...originalPerms });
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={15} />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-
-            {PERMISSION_GROUPS.map(group => {
-              const groupPerms = group.perms.filter(p => p in overrideData.roleDefaults);
-              if (!groupPerms.length) return null;
-
-              return (
-                <div key={group.label} className="mb-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
-                    {group.label}
-                  </h4>
-                  <div className="space-y-1">
-                    {groupPerms.map(perm => {
-                      const roleDefault = !!overrideData.roleDefaults[perm];
-                      const hasOverride = perm in localOverrides;
-                      const overrideValue = localOverrides[perm];
-
-                      let effectiveValue: boolean;
-                      let stateLabel: string;
-                      let stateBg: string;
-
-                      if (hasOverride) {
-                        effectiveValue = !!overrideValue;
-                        stateLabel = overrideValue ? 'GRANTED' : 'DENIED';
-                        stateBg = overrideValue
-                          ? 'bg-success-50 border-success-100'
-                          : 'bg-danger-50 border-danger-100';
-                      } else {
-                        effectiveValue = roleDefault;
-                        stateLabel = 'INHERIT';
-                        stateBg = 'bg-surface-sunken border-border';
-                      }
-
-                      return (
-                        <button
-                          key={perm}
-                          onClick={() => cycleOverride(perm)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-[var(--radius-sm)] border text-left transition-all duration-150 ${stateBg} hover:shadow-xs`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full ${
-                              effectiveValue ? 'bg-success-500' : 'bg-danger-500'
-                            }`} />
-                            <span className="text-[13px] text-text-primary">{formatPermLabel(perm)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {hasOverride && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                overrideValue
-                                  ? 'text-success-700 bg-success-100'
-                                  : 'text-danger-700 bg-danger-100'
-                              }`}>
-                                {stateLabel}
-                              </span>
-                            )}
-                            {!hasOverride && (
-                              <span className="text-[10px] text-text-disabled font-medium">
-                                {roleDefault ? 'ON' : 'OFF'} (role default)
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        ) : null}
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }

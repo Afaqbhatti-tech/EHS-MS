@@ -10,13 +10,15 @@ export default function AppLayout() {
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
-    <div className="flex h-screen bg-canvas">
+    <div className="flex w-full max-w-full h-dvh bg-canvas overflow-hidden" style={{ height: '100dvh' }}>
       <Sidebar open={sidebarOpen} onClose={closeSidebar} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header onToggleSidebar={toggleSidebar} />
-        <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          <Outlet />
-        </main>
+        <div className="flex-1 min-h-0 px-4 sm:px-6 lg:px-8">
+          <main className="main-scroll-area h-full overflow-y-auto overflow-x-hidden py-4 sm:py-6 lg:py-8">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Constants\StatusConstants;
+use App\Services\NotificationService;
 
 class RamsDocumentController extends Controller
 {
@@ -94,42 +96,48 @@ class RamsDocumentController extends Controller
             'file' => 'nullable|file|max:51200', // 50MB
         ]);
 
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        // Generate ref number: RAMS-{WORKLINE_SLUG}-{NNNN}
-        $workLine = WorkLine::findOrFail($validated['work_line_id']);
-        $prefix = 'RAMS-' . strtoupper(Str::substr(Str::slug($workLine->name, ''), 0, 4));
-        $lastRef = RamsDocument::where('ref_number', 'like', $prefix . '-%')
-            ->orderByDesc('ref_number')
-            ->value('ref_number');
-        $nextNum = $lastRef ? ((int) substr($lastRef, strrpos($lastRef, '-') + 1)) + 1 : 1;
-        $refNumber = $prefix . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            // Generate ref number: RAMS-{WORKLINE_SLUG}-{NNNN}
+            $workLine = WorkLine::findOrFail($validated['work_line_id']);
+            $prefix = 'RAMS-' . strtoupper(Str::substr(Str::slug($workLine->name, ''), 0, 4));
+            $lastRef = RamsDocument::where('ref_number', 'like', $prefix . '-%')
+                ->orderByDesc('ref_number')
+                ->value('ref_number');
+            $nextNum = $lastRef ? ((int) substr($lastRef, strrpos($lastRef, '-') + 1)) + 1 : 1;
+            $refNumber = $prefix . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
-        return DB::transaction(function () use ($validated, $user, $refNumber, $request) {
-            $doc = RamsDocument::create([
-                'id' => (string) Str::uuid(),
-                'work_line_id' => $validated['work_line_id'],
-                'ref_number' => $refNumber,
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'contractor' => $validated['contractor'] ?? null,
-                'zone' => $validated['zone'] ?? null,
-                'status' => 'Draft',
-                'current_version' => 0,
-                'submitted_by' => $user->id,
-                'due_date' => $validated['due_date'] ?? null,
-                'tags' => $validated['tags'] ?? null,
-            ]);
+            return DB::transaction(function () use ($validated, $user, $refNumber, $request) {
+                $doc = RamsDocument::create([
+                    'id' => (string) Str::uuid(),
+                    'work_line_id' => $validated['work_line_id'],
+                    'ref_number' => $refNumber,
+                    'title' => $validated['title'],
+                    'description' => $validated['description'] ?? null,
+                    'contractor' => $validated['contractor'] ?? null,
+                    'zone' => $validated['zone'] ?? null,
+                    'status' => StatusConstants::RAMS_DRAFT,
+                    'current_version' => 0,
+                    'submitted_by' => $user->id,
+                    'due_date' => $validated['due_date'] ?? null,
+                    'tags' => $validated['tags'] ?? null,
+                ]);
 
-            // If a file was uploaded, create version 1
-            if ($request->hasFile('file')) {
-                $this->createVersion($doc, $request->file('file'), $user->id, 'Initial upload');
-            }
+                // If a file was uploaded, create version 1
+                if ($request->hasFile('file')) {
+                    $this->createVersion($doc, $request->file('file'), $user->id, 'Initial upload');
+                }
 
-            $doc->load(['workLine:id,name,slug,color', 'submitter:id,full_name', 'latestVersion']);
+                $doc->load(['workLine:id,name,slug,color', 'submitter:id,full_name', 'latestVersion']);
 
-            return response()->json($this->formatDocument($doc), 201);
-        });
+                NotificationService::ramsSubmitted($doc, $user->id);
+
+                return response()->json($this->formatDocument($doc), 201);
+            });
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to create document: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -138,8 +146,6 @@ class RamsDocumentController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
-        $doc = RamsDocument::findOrFail($id);
-
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
@@ -150,10 +156,18 @@ class RamsDocumentController extends Controller
             'work_line_id' => 'sometimes|string|exists:work_lines,id',
         ]);
 
-        $doc->update($validated);
-        $doc->load(['workLine:id,name,slug,color', 'submitter:id,full_name', 'approver:id,full_name', 'latestVersion']);
+        try {
+            $doc = RamsDocument::findOrFail($id);
 
-        return response()->json($this->formatDocument($doc));
+            $doc->update($validated);
+            $doc->load(['workLine:id,name,slug,color', 'submitter:id,full_name', 'approver:id,full_name', 'latestVersion']);
+
+            return response()->json($this->formatDocument($doc));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to update document: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -237,6 +251,8 @@ class RamsDocumentController extends Controller
         $doc->save();
         $doc->load(['workLine:id,name,slug,color', 'submitter:id,full_name', 'approver:id,full_name', 'latestVersion']);
 
+        NotificationService::ramsStatusChanged($doc, $newStatus, $user->id);
+
         return response()->json($this->formatDocument($doc));
     }
 
@@ -245,18 +261,24 @@ class RamsDocumentController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $doc = RamsDocument::findOrFail($id);
+        try {
+            $doc = RamsDocument::findOrFail($id);
 
-        // Delete associated files
-        foreach ($doc->versions as $version) {
-            if ($version->file_path && Storage::disk('local')->exists($version->file_path)) {
-                Storage::disk('local')->delete($version->file_path);
+            // Delete associated files
+            foreach ($doc->versions as $version) {
+                if ($version->file_path && Storage::disk('local')->exists($version->file_path)) {
+                    Storage::disk('local')->delete($version->file_path);
+                }
             }
+
+            $doc->delete();
+
+            return response()->json(['message' => 'Document deleted.']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to delete document: ' . $e->getMessage()], 500);
         }
-
-        $doc->delete();
-
-        return response()->json(['message' => 'Document deleted.']);
     }
 
     /**
@@ -303,6 +325,10 @@ class RamsDocumentController extends Controller
 
     private function createVersion(RamsDocument $doc, $file, string $userId, ?string $notes = null): RamsDocumentVersion
     {
+        if (!$file || !$file->isValid()) {
+            throw new \RuntimeException('File upload failed or file is invalid.');
+        }
+
         $nextVersion = $doc->current_version + 1;
         $fileName = $file->getClientOriginalName();
         $storagePath = $file->storeAs(
@@ -310,6 +336,10 @@ class RamsDocumentController extends Controller
             "v{$nextVersion}_" . Str::slug(pathinfo($fileName, PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension(),
             'local'
         );
+
+        if (!$storagePath) {
+            throw new \RuntimeException('Failed to store uploaded file.');
+        }
 
         $version = RamsDocumentVersion::create([
             'id' => (string) Str::uuid(),
@@ -374,10 +404,10 @@ class RamsDocumentController extends Controller
                 'version_number' => $doc->latestVersion->version_number,
                 'file_name' => $doc->latestVersion->file_name,
                 'file_size' => $doc->latestVersion->file_size,
-                'uploaded_at' => $doc->latestVersion->created_at->toISOString(),
+                'uploaded_at' => $doc->latestVersion->created_at?->toISOString(),
             ] : null,
-            'created_at' => $doc->created_at->toISOString(),
-            'updated_at' => $doc->updated_at->toISOString(),
+            'created_at' => $doc->created_at?->toISOString(),
+            'updated_at' => $doc->updated_at?->toISOString(),
         ];
     }
 }

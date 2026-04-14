@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { X as XIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface ModalProps {
@@ -13,17 +13,17 @@ interface ModalProps {
 }
 
 const sizeStyles = {
-  sm: 'max-w-[400px]',
-  md: 'max-w-[560px]',
-  lg: 'max-w-[720px]',
+  sm: 'max-w-[min(400px,90vw)]',
+  md: 'max-w-[min(560px,90vw)]',
+  lg: 'max-w-[min(720px,90vw)]',
 };
 
 export default function Modal({ open, onClose, title, subtitle, children, footer, size = 'md' }: ModalProps) {
+  // Lock body scroll while modal is open — always clean up on unmount
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
+    if (!open) return;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
   }, [open]);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
       />
       <div
         className={clsx(
-          'relative bg-white rounded-none sm:rounded-[var(--radius-lg)] shadow-xl w-full sm:mx-4 max-h-[100dvh] sm:max-h-[90vh] flex flex-col',
+          'relative bg-white rounded-none sm:rounded-[var(--radius-lg)] shadow-xl w-full sm:mx-4 max-h-[100dvh] sm:max-h-[90vh] flex flex-col overflow-hidden',
           'animate-in fade-in zoom-in-[0.97] duration-200 ease-out',
           'sm:w-auto sm:min-w-[min(90vw,400px)]',
           sizeStyles[size],
@@ -62,14 +62,16 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
               onClick={onClose}
               className="p-1.5 rounded-[var(--radius-sm)] text-text-tertiary hover:bg-surface-sunken hover:text-text-secondary transition-colors duration-150 shrink-0"
             >
-              <X size={18} />
+              <XIcon size={18} />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">
-          {children}
+        {/* Body — scrollable area isolated from header/footer */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="px-4 sm:px-6 py-4 sm:py-5">
+            {children}
+          </div>
         </div>
 
         {/* Footer */}

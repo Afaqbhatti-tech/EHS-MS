@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Constants\Permissions;
+use App\Constants\PermissionRegistry;
 use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermissionOverride;
@@ -49,15 +49,12 @@ class PermissionService
     }
 
     /**
-     * Return all permissions as granted.
+     * Return all permissions as granted — derived from the PermissionRegistry.
+     * Adding a permission to the registry automatically makes it included here.
      */
     public function allGranted(): array
     {
-        $all = [];
-        foreach (Permissions::ALL as $p) {
-            $all[$p] = true;
-        }
-        return $all;
+        return PermissionRegistry::allGranted();
     }
 
     /**

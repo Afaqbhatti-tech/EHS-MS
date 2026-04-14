@@ -22,6 +22,9 @@ class Notification extends Model
         'ref_module',
         'ref_id',
         'read_at',
+        'dedup_key',
+        'created_at',
+        'updated_at',
     ];
 
     protected function casts(): array

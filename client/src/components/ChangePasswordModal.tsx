@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Eye, EyeOff, Lock, Check, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Eye, EyeOff, Lock, Check, X as XIcon } from 'lucide-react';
 import Modal from './ui/Modal';
 import Input from './ui/Input';
 import Button from './ui/Button';
@@ -33,6 +33,12 @@ export default function ChangePasswordModal({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Cleanup timer on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
 
   const allRulesPass = PASSWORD_RULES.every((r) => r.test(newPassword));
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
@@ -70,7 +76,7 @@ export default function ChangePasswordModal({ open, onClose }: Props) {
         new_password_confirmation: confirmPassword,
       });
       setSuccess(true);
-      setTimeout(() => handleClose(), 1500);
+      timerRef.current = setTimeout(() => handleClose(), 1500);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to change password';
       setError(message);
@@ -117,7 +123,7 @@ export default function ChangePasswordModal({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-100 rounded-[var(--radius-md)] text-[13px] text-danger-700">
-              <X size={14} className="shrink-0 mt-0.5" />
+              <XIcon size={14} className="shrink-0 mt-0.5" />
               {error}
             </div>
           )}
